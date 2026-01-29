@@ -3,7 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Pelaporan - Balai Bahasa Sultra</title>
+    <title>
+        @auth
+            @if(Auth::user()->role === 'admin')
+                Dashboard Admin - Balai Bahasa Sultra
+            @elseif(Auth::user()->role === 'pegawai')
+                Dashboard Pegawai - Balai Bahasa Sultra
+            @else
+                Login - Balai Bahasa Sultra
+            @endif
+        @else
+            Login - Balai Bahasa Sultra
+        @endauth
+    </title>
 
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
