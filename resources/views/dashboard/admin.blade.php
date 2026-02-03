@@ -263,7 +263,7 @@
                     <h4 class="font-bold text-red-700 text-sm mb-2 flex items-center gap-2">
                         <i class="fa-solid fa-triangle-exclamation"></i> Zona Bahaya
                     </h4>
-                    <form id="formDeleteActivity" action="{{ route('activities.destroy', $activity->id) }}" method="POST">
+                    <form id="formDeleteActivity" method="POST">
                         @csrf
                         @method('DELETE')
                         <button type="button" onclick="confirmDeleteActivity(this)"
