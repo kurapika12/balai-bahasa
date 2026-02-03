@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Report;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str; // Tambahkan ini untuk mengubah judul jadi nama file
 
 class ReportController extends Controller
 {
@@ -13,7 +14,7 @@ class ReportController extends Controller
         $request->validate([
             'activity_id' => 'required',
             'title' => 'required',
-            'file' => 'required|mimes:pdf,doc,docx,xls,xlsx,jpg,png|max:10240', // Max 10MB
+            'file' => 'required|mimes:pdf,doc,docx,xls,xlsx,jpg,png|max:10240',
             'type' => 'required'
         ]);
 
@@ -32,12 +33,15 @@ class ReportController extends Controller
     }
 
     public function destroy($id) {
-        // Hanya admin yang bisa hapus
         if(Auth::user()->role !== 'admin') abort(403);
 
         $report = Report::findOrFail($id);
-        Storage::disk('public')->delete($report->file_path); // Hapus file fisik
-        $report->delete(); // Hapus data di DB
+        
+        if (Storage::disk('public')->exists($report->file_path)) {
+            Storage::disk('public')->delete($report->file_path);
+        }
+        
+        $report->delete();
 
         return back()->with('success', 'Laporan dihapus.');
     }
@@ -45,10 +49,18 @@ class ReportController extends Controller
     public function download($id) {
         $report = Report::findOrFail($id);
 
-        // UPDATE: Hapus pengecekan kepemilikan agar semua pegawai bisa download
-        // Pastikan hanya user login yg bisa (middleware auth sudah menangani ini)
+        // Cek keberadaan file fisik
+        if (!Storage::disk('public')->exists($report->file_path)) {
+            return back()->with('error', 'File fisik tidak ditemukan di server.');
+        }
 
-        // UPDATE: Gunakan disk 'public' secara eksplisit untuk mencegah error Metadata
-        return Storage::disk('public')->download($report->file_path);
+        // AMBIL EKSTENSI ASLI (misal: .pdf, .docx)
+        $extension = pathinfo($report->file_path, PATHINFO_EXTENSION);
+
+        // UBAH NAMA FILE JADI SESUAI JUDUL (misal: Laporan Keuangan -> laporan-keuangan.pdf)
+        $newFilename = Str::slug($report->title) . '.' . $extension;
+
+        // Download dengan nama baru
+        return Storage::disk('public')->download($report->file_path, $newFilename);
     }
 }

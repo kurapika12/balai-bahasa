@@ -30,5 +30,14 @@ class UserSeeder extends Seeder
                 'role' => 'pegawai',
             ]
         );
+
+                User::firstOrCreate(
+            ['username' => 'izhar'],
+            [
+                'name' => 'Izhar',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
     }
 }
