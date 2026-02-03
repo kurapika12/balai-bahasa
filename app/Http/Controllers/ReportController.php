@@ -13,11 +13,17 @@ class ReportController extends Controller
         $request->validate([
             'activity_id' => 'required',
             'title' => 'required',
-            'file' => 'required|mimes:pdf,doc,docx,xls,xlsx,jpg,png|max:10240', // Max 10MB
+            'file' => 'required|mimes:pdf,doc,docx,xls,xlsx,jpg,png|max:10240',
             'type' => 'required'
         ]);
 
-        $path = $request->file('file')->store('reports', 'public');
+        $file = $request->file('file');
+
+        // 🔹 Ambil nama asli file
+        $originalName = $file->getClientOriginalName();
+
+        // 🔹 File tetap disimpan dengan nama acak (default Laravel)
+        $path = $file->store('reports', 'public');
 
         Report::create([
             'user_id' => Auth::id(),
@@ -25,7 +31,8 @@ class ReportController extends Controller
             'title' => $request->title,
             'type' => $request->type,
             'description' => $request->description,
-            'file_path' => $path
+            'file_path' => $path,
+            'original_filename' => $originalName // kolom baru
         ]);
 
         return back()->with('success', 'Laporan berhasil diunggah!');
@@ -33,11 +40,15 @@ class ReportController extends Controller
 
     public function destroy($id) {
         // Hanya admin yang bisa hapus
-        if(Auth::user()->role !== 'admin') abort(403);
+        if (Auth::user()->role !== 'admin') abort(403);
 
         $report = Report::findOrFail($id);
-        Storage::disk('public')->delete($report->file_path); // Hapus file fisik
-        $report->delete(); // Hapus data di DB
+
+        // Hapus file fisik
+        Storage::disk('public')->delete($report->file_path);
+
+        // Hapus data DB
+        $report->delete();
 
         return back()->with('success', 'Laporan dihapus.');
     }
@@ -45,10 +56,11 @@ class ReportController extends Controller
     public function download($id) {
         $report = Report::findOrFail($id);
 
-        // UPDATE: Hapus pengecekan kepemilikan agar semua pegawai bisa download
-        // Pastikan hanya user login yg bisa (middleware auth sudah menangani ini)
+        // 🔹 Jika file lama belum punya original_filename, pakai nama dari path
+        $downloadName = $report->original_filename
+            ? $report->original_filename
+            : basename($report->file_path);
 
-        // UPDATE: Gunakan disk 'public' secara eksplisit untuk mencegah error Metadata
-        return Storage::disk('public')->download($report->file_path);
+        return Storage::disk('public')->download($report->file_path, $downloadName);
     }
 }

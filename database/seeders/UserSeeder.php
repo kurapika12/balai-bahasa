@@ -25,7 +25,52 @@ class UserSeeder extends Seeder
         User::firstOrCreate(
             ['username' => 'alam'],
             [
-                'name' => 'Alam',
+                'name' => 'Muhammad Aslam Hidayat',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
+
+        User::firstOrCreate(
+            ['username' => 'falah'],
+            [
+                'name' => 'Falah Zikri',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
+
+        User::firstOrCreate(
+            ['username' => 'zahra'],
+            [
+                'name' => 'Wa Ode Zahra Ramadani',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
+
+        User::firstOrCreate(
+            ['username' => 'pingki'],
+            [
+                'name' => 'Wa Ode Fitri Nur Ramadhani',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
+
+        User::firstOrCreate(
+            ['username' => 'adhan'],
+            [
+                'name' => 'La Ode Muhammad Ahmad Radha Halu',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
+
+        User::firstOrCreate(
+            ['username' => 'izhar'],
+            [
+                'name' => 'Muhammad Izzharudin',
                 'password' => Hash::make('password123'),
                 'role' => 'pegawai',
             ]

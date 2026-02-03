@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('title');
             $table->enum('type', ['Keuangan', 'Dokumentasi', 'Narasi']);
             $table->string('file_path');
+            $table->string('original_filename'); // BARU: Simpan nama asli file
             $table->text('description')->nullable();
             $table->timestamps();
         });
