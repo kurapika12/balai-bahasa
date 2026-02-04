@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Report;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str; // Tambahkan ini untuk mengubah judul jadi nama file
 
 class ReportController extends Controller
 {
@@ -40,15 +41,11 @@ class ReportController extends Controller
 
     public function destroy($id) {
         // Hanya admin yang bisa hapus
-        if (Auth::user()->role !== 'admin') abort(403);
+        if(Auth::user()->role !== 'admin') abort(403);
 
         $report = Report::findOrFail($id);
-
-        // Hapus file fisik
-        Storage::disk('public')->delete($report->file_path);
-
-        // Hapus data DB
-        $report->delete();
+        Storage::disk('public')->delete($report->file_path); // Hapus file fisik
+        $report->delete(); // Hapus data di DB
 
         return back()->with('success', 'Laporan dihapus.');
     }
@@ -56,11 +53,10 @@ class ReportController extends Controller
     public function download($id) {
         $report = Report::findOrFail($id);
 
-        // 🔹 Jika file lama belum punya original_filename, pakai nama dari path
-        $downloadName = $report->original_filename
-            ? $report->original_filename
-            : basename($report->file_path);
+        // UPDATE: Hapus pengecekan kepemilikan agar semua pegawai bisa download
+        // Pastikan hanya user login yg bisa (middleware auth sudah menangani ini)
 
-        return Storage::disk('public')->download($report->file_path, $downloadName);
+        // UPDATE: Gunakan disk 'public' secara eksplisit untuk mencegah error Metadata
+        return Storage::disk('public')->download($report->file_path);
     }
 }

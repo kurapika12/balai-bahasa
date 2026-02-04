@@ -61,7 +61,7 @@ class UserSeeder extends Seeder
         User::firstOrCreate(
             ['username' => 'adhan'],
             [
-                'name' => 'La Ode Muhammad Ahmad Radha Halu',
+                'name' => 'La Ode Muhammad Rahmad Adhan Halu',
                 'password' => Hash::make('password123'),
                 'role' => 'pegawai',
             ]
@@ -71,6 +71,15 @@ class UserSeeder extends Seeder
             ['username' => 'izhar'],
             [
                 'name' => 'Muhammad Izzharudin',
+                'password' => Hash::make('password123'),
+                'role' => 'pegawai',
+            ]
+        );
+
+                User::firstOrCreate(
+            ['username' => 'izhar'],
+            [
+                'name' => 'Izhar',
                 'password' => Hash::make('password123'),
                 'role' => 'pegawai',
             ]

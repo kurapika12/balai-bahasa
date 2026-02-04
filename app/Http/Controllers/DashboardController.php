@@ -1,7 +1,4 @@
 <?php
-
-namespace App\Http\Controllers;
-
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -14,11 +11,12 @@ use Illuminate\Support\Facades\Hash;
 class DashboardController extends Controller
 {
     public function index() {
-        // Ambil kegiatan beserta laporan dan user pembuatnya
+        // SUDAH BENAR: with(['reports.user']) diperlukan untuk modal detail
         $activities = Activity::with(['reports.user'])->latest('date')->get();
 
         if (Auth::user()->role == 'admin') {
             $totalReports = Report::count();
+            // PASTIKAN: File blade Anda ada di folder resources/views/dashboard/admin.blade.php
             return view('dashboard.admin', compact('activities', 'totalReports'));
         } else {
             return view('dashboard.pegawai', compact('activities'));
@@ -29,19 +27,23 @@ class DashboardController extends Controller
     public function storeActivity(Request $request) {
         $request->validate([
             'title' => 'required',
-            'status' => 'required'
+            'status' => 'required',
+            'date' => 'required|date', // Tambahkan validasi tanggal agar aman
         ]);
+        
         Activity::create($request->all());
+        
         return back()->with('success', 'Kegiatan dibuat!');
     }
 
-    // Fungsi Admin Edit Kegiatan (BARU)
+    // Fungsi Admin Edit Kegiatan
     public function updateActivity(Request $request, $id) {
         if (Auth::user()->role !== 'admin') abort(403);
 
         $request->validate([
             'title' => 'required',
-            'status' => 'required'
+            'status' => 'required',
+            'date' => 'nullable|date',
         ]);
 
         $activity = Activity::findOrFail($id);
@@ -55,6 +57,10 @@ class DashboardController extends Controller
         if (Auth::user()->role !== 'admin') abort(403);
 
         $activity = Activity::findOrFail($id);
+        
+        // Opsional: Hapus file fisik laporan jika ada, sebelum hapus record DB
+        // (Logic penghapusan file bisa ditambahkan di sini jika perlu)
+        
         $activity->delete();
 
         return back()->with('success', 'Kegiatan berhasil dihapus.');

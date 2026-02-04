@@ -15,5 +15,4 @@ class Report extends Model
     public function activity() {
         return $this->belongsTo(Activity::class);
     }
-
 }
