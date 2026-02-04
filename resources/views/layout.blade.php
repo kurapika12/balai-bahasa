@@ -59,7 +59,7 @@
                             <span class="text-sm font-semibold text-gray-600 leading-tight">Provinsi Sulawesi Tenggara</span>
 
                             <!-- Hidden on Mobile to save space -->
-                            <span class="hidden md:block mt-2.5 text-[11px] font-bold text-gray-500 uppercase tracking-widest leading-tight">Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi</span>
+                            <span class="hidden md:block mt-2.5 text-[11px] font-bold text-gray-500 uppercase tracking-widest leading-tight">KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH</span>
                         </div>
                     </div>
                 </div>
@@ -117,7 +117,7 @@
             <div>
                 <h4 class="font-bold text-lg mb-4 text-yellow-400">Balai Bahasa Sultra</h4>
                 <p class="text-sm text-blue-100 leading-relaxed">
-                    Unit Pelaksana Teknis Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi yang bertugas melaksanakan pelindungan dan pemasyarakatan bahasa dan sastra Indonesia di Sulawesi Tenggara.
+                    Unit Pelaksana Teknis KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH yang bertugas melaksanakan pelindungan dan pemasyarakatan bahasa dan sastra Indonesia di Sulawesi Tenggara.
                 </p>
             </div>
             <div>
