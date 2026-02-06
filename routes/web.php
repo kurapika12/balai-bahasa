@@ -22,6 +22,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/activities', [DashboardController::class, 'storeActivity']);
     Route::put('/activities/{id}', [DashboardController::class, 'updateActivity'])->name('activities.update'); // Route Baru
     Route::delete('/activities/{id}', [DashboardController::class, 'destroyActivity'])->name('activities.destroy');
+    Route::put('/users/{id}', [DashboardController::class, 'updateUser'])->name('users.update');
+    Route::delete('/users/{id}', [DashboardController::class, 'destroyUser'])->name('users.destroy');
 
     // Admin User Management
     Route::post('/users', [DashboardController::class, 'storeUser'])->name('users.store');

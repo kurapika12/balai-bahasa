@@ -29,7 +29,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="icon" href="{{ asset('images/logo.png') }}" type="images/png">
+    <link rel="icon" href="{{ asset('images/maskot-imbu.png') }}" type="images/png">
 
 
     <style>
@@ -48,8 +48,10 @@
                 <div class="flex items-center">
                     <div class="flex-shrink-0 flex items-center gap-4">
                         <!-- Logo Placeholder -->
-                        <div class="h-14 w-14 rounded-full overflow-hidden shadow-md border-2 border-yellow-400">
-                            <img src="{{ asset('images/logo.png') }}" alt="Logo Balai Bahasa" class="h-full w-full object-cover">
+                        <div class="h-16 w-32 sm:h-20 sm:w-44 ml-2 sm:ml-6">
+                            <img src="{{ asset('images/logo-balai-bahasa.png') }}"
+                                alt="Logo Balai Bahasa"
+                                class="h-full w-full object-contain">
                         </div>
                         <div class="flex flex-col justify-center">
 
@@ -145,7 +147,7 @@
             </div>
         </div>
         <div class="text-center border-t border-blue-800 pt-6 text-xs text-blue-200">
-            &copy; {{ date('Y') }} Sistem Informasi Pelaporan Kegiatan. KKP BALAI BAHASA 2026
+            &copy; {{ date('Y') }} Sistem Informasi Pelaporan Kegiatan. KKP UHO BALAI BAHASA 2026
         </div>
     </footer>
 

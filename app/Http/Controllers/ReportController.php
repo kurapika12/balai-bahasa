@@ -50,13 +50,13 @@ class ReportController extends Controller
         return back()->with('success', 'Laporan dihapus.');
     }
 
-    public function download($id) {
+    public function download($id)
+    {
         $report = Report::findOrFail($id);
 
-        // UPDATE: Hapus pengecekan kepemilikan agar semua pegawai bisa download
-        // Pastikan hanya user login yg bisa (middleware auth sudah menangani ini)
-
-        // UPDATE: Gunakan disk 'public' secara eksplisit untuk mencegah error Metadata
-        return Storage::disk('public')->download($report->file_path);
+        return Storage::disk('public')->download(
+            $report->file_path,
+            $report->original_filename // ← ini kuncinya
+        );
     }
 }

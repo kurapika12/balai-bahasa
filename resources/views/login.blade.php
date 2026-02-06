@@ -12,7 +12,7 @@
 
             <div class="relative z-10 flex flex-col items-center">
                 <div class="h-20 w-20 rounded-full overflow-hidden shadow-md border-2 border-yellow-400">
-                    <img src="{{ asset('images/logo.png') }}" alt="Logo Balai Bahasa" class="h-full w-full object-cover">
+                    <img src="{{ asset('images/maskot-imbu.png') }}" alt="Logo Balai Bahasa" class="h-full w-full object-cover">
                 </div>
                 <h2 class="text-2xl font-bold text-white tracking-wide">PORTAL MASUK</h2>
                 <p class="text-blue-200 text-sm mt-1 uppercase tracking-wider font-semibold">Sistem Pelaporan Kegiatan Pegawai</p>

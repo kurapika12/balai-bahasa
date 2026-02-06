@@ -2,16 +2,18 @@
 
 @section('content')
 <!-- Welcome Banner -->
-<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8 flex items-center justify-between relative overflow-hidden">
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8 flex flex-col md:flex-row items-center justify-between relative overflow-hidden">
     <div class="relative z-10">
-        <h2 class="text-2xl font-bold text-blue-900">Selamat Datang, {{ Auth::user()->name }}</h2>
-        <p class="text-gray-600 mt-1">Pilih kegiatan di bawah ini untuk melihat detail dan mengunggah laporan tugas Anda.</p>
+        <h2 class="text-2xl font-bold text-blue-900 text-center md:text-left">Selamat Datang, {{ Auth::user()->name }}</h2>
+        <p class="text-gray-600 mt-1 text-center md:text-left text-sm">Silakan pilih agenda kegiatan di bawah untuk melihat detail dan mengunggah laporan.</p>
     </div>
     <div class="hidden md:block relative z-10 text-right">
         <div class="text-sm font-bold text-gray-500 uppercase">Tanggal Hari Ini</div>
-        <div class="text-xl font-bold text-blue-900"><i class="fa-regular fa-calendar-days mr-2 text-yellow-500"></i> {{ date('d F Y') }}</div>
+        <div class="text-xl font-bold text-blue-900">
+            <i class="fa-regular fa-calendar-days mr-2 text-yellow-500"></i> {{ date('d F Y') }}
+        </div>
     </div>
-    <!-- Decor -->
+    <!-- Decor Official -->
     <div class="absolute right-0 top-0 h-full w-2 bg-yellow-500"></div>
 </div>
 
@@ -19,113 +21,140 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     @forelse($activities as $activity)
     <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition duration-300 transform hover:-translate-y-1 flex flex-col h-full group">
-        <!-- Card Header -->
+        <!-- Card Header Accent -->
         <div class="h-3 bg-blue-900 group-hover:bg-yellow-500 transition-colors duration-300"></div>
+
         <div class="p-6 flex-grow">
-            <div class="flex items-center justify-between mb-3">
-                 <span class="bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide border border-blue-100">
-                    <i class="fa-regular fa-calendar mr-1"></i> {{ \Carbon\Carbon::parse($activity->date)->format('d M Y') }}
+            <div class="flex items-center justify-between mb-4">
+                 <!-- Date Range Badge -->
+                 <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full border border-blue-100">
+                    <i class="fa-regular fa-calendar mr-1"></i>
+                    {{ $activity->start_date ? \Carbon\Carbon::parse($activity->start_date)->format('d M') : '?' }} -
+                    {{ $activity->end_date ? \Carbon\Carbon::parse($activity->end_date)->format('d M Y') : '?' }}
                 </span>
 
                 <!-- Status Badge -->
                 @php
-                    $statusColor = 'bg-gray-100 text-gray-600';
+                    $statusColor = 'bg-gray-100 text-gray-600 border-gray-200';
                     if($activity->status == 'Sedang Berlangsung') $statusColor = 'bg-green-100 text-green-700 border-green-200';
                     if($activity->status == 'Akan Datang') $statusColor = 'bg-blue-100 text-blue-700 border-blue-200';
-                    if($activity->status == 'Selesai') $statusColor = 'bg-red-100 text-red-500 border-red-200';
+                    if($activity->status == 'Selesai') $statusColor = 'bg-gray-100 text-gray-500 border-gray-200';
                 @endphp
                 <span class="text-[10px] font-bold px-2 py-1 rounded border {{ $statusColor }}">
                     {{ $activity->status }}
                 </span>
             </div>
+
             <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-900 transition">{{ $activity->title }}</h3>
-            <p class="text-gray-600 text-sm line-clamp-3">{{ $activity->description }}</p>
+            <p class="text-gray-600 text-sm line-clamp-3 leading-relaxed mb-4">{{ $activity->description }}</p>
+
+            <!-- Involved Peek -->
+            <div class="flex items-center gap-2 text-xs text-gray-400 font-medium">
+                <i class="fa-solid fa-users"></i>
+                <span>{{ $activity->involvedEmployees->count() }} Pegawai Terlibat</span>
+            </div>
         </div>
+
         <div class="p-6 pt-0 mt-auto">
-            <button onclick="openModal({{ $activity->id }})" class="w-full bg-white border-2 border-blue-900 text-blue-900 hover:bg-blue-900 hover:text-white font-bold py-2 rounded-lg transition-all duration-300 flex justify-center items-center gap-2">
+            <button onclick="openModal({{ $activity->id }})" class="w-full bg-white border-2 border-blue-900 text-blue-900 hover:bg-blue-900 hover:text-white font-bold py-2.5 rounded-lg transition-all duration-300 flex justify-center items-center gap-2 shadow-sm">
                 <i class="fa-solid fa-folder-open"></i> Buka Kegiatan
             </button>
         </div>
     </div>
     @empty
-    <div class="col-span-3 text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-        <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300 mb-3"></i>
-        <p class="text-gray-500">Belum ada agenda kegiatan yang tersedia.</p>
+    <div class="col-span-full text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
+        <div class="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300"></i>
+        </div>
+        <p class="text-gray-500 font-medium tracking-tight">Belum ada agenda kegiatan yang tersedia saat ini.</p>
     </div>
     @endforelse
 </div>
 
-<!-- Modal Interactive -->
+<!-- Modal Interactive Detail & Upload -->
 <div id="activityModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity opacity-0">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] overflow-hidden flex flex-col transform scale-95 transition-transform duration-300" id="modalContent">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] overflow-hidden flex flex-col transform scale-95 transition-transform duration-300" id="modalContent">
 
         <!-- Modal Header -->
-        <div class="bg-blue-900 px-6 py-4 flex justify-between items-center flex-shrink-0">
+        <div class="bg-blue-900 px-6 py-5 flex justify-between items-center flex-shrink-0 border-b-4 border-yellow-500">
             <div>
-                <h3 class="font-bold text-white text-lg" id="modalTitle">Judul Kegiatan</h3>
-                <p class="text-blue-200 text-xs" id="modalDate">Tanggal</p>
+                <h3 class="font-bold text-white text-xl uppercase tracking-tight" id="modalTitle">Judul Kegiatan</h3>
+                <p class="text-blue-200 text-xs mt-1" id="modalDateRange"><i class="fa-regular fa-calendar mr-1"></i> Tanggal Mulai - Selesai</p>
             </div>
-            <button onclick="closeModal()" class="text-white hover:text-yellow-400 text-2xl transition">
-                <i class="fa-solid fa-xmark"></i>
+            <button onclick="closeModal()" class="text-white hover:text-yellow-400 text-2xl transition duration-200">
+                <i class="fa-solid fa-circle-xmark"></i>
             </button>
         </div>
 
-        <!-- Modal Body (Split Layout) -->
+        <!-- Modal Body -->
         <div class="flex flex-col lg:flex-row flex-grow overflow-hidden">
 
-            <!-- Kiri: Form Upload -->
+            <!-- Kiri: Info & Form Unggah -->
             <div class="w-full lg:w-1/3 bg-gray-50 p-6 overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200">
-                <h4 class="font-bold text-blue-900 mb-4 flex items-center gap-2">
+
+                <!-- Pegawai Terlibat Section -->
+                <div class="mb-8">
+                    <h4 class="font-bold text-gray-700 uppercase tracking-widest text-[10px] mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-user-tag text-blue-600"></i> Pegawai Terlibat Resmi:
+                    </h4>
+                    <div id="modalInvolvedList" class="flex flex-wrap gap-1">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <hr class="mb-8 border-gray-200">
+
+                <h4 class="font-bold text-blue-900 mb-4 flex items-center gap-2 text-sm">
                     <i class="fa-solid fa-cloud-arrow-up"></i> Unggah Laporan Baru
                 </h4>
 
                 <form action="{{ route('reports.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
                     @csrf
-                    <!-- Hidden Activity ID -->
                     <input type="hidden" name="activity_id" id="formActivityId">
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Judul Laporan</label>
-                        <input type="text" name="title" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 border" placeholder="Contoh: Nota Konsumsi..." required>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Judul Laporan</label>
+                        <input type="text" name="title" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2.5 border" placeholder="Contoh: Notula Rapat Hari-1..." required>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Jenis Dokumen</label>
-                        <select name="type" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 border">
-                            <option value="Dokumentasi">Dokumentasi</option>
-                            <option value="Keuangan">Keuangan</option>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Jenis Dokumen</label>
+                        <select name="type" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2.5 border bg-white">
                             <option value="Narasi">Narasi / Notula</option>
+                            <option value="Keuangan">Keuangan / Nota</option>
+                            <option value="Dokumentasi">Dokumentasi / Foto</option>
                         </select>
                     </div>
 
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">File</label>
-                        <input type="file" name="file" class="w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" required>
+                    <div class="bg-white p-4 rounded-lg border-2 border-dashed border-gray-200 hover:border-blue-400 transition cursor-pointer relative group">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2">Berkas Laporan</label>
+                        <input type="file" name="file" class="w-full text-xs text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
+                        <p class="text-[9px] text-gray-400 mt-2 italic">* PDF, DOCX, JPG, XLSX (Maks. 10MB)</p>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Keterangan</label>
-                        <textarea name="description" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2 border"></textarea>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Keterangan Singkat (Opsional)</label>
+                        <textarea name="description" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-xs p-2.5 border" placeholder="Catatan tambahan mengenai berkas ini..."></textarea>
                     </div>
 
-                    <button class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 rounded shadow transition flex justify-center items-center gap-2">
-                        <i class="fa-solid fa-paper-plane"></i> Kirim
+                    <button class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 rounded-lg shadow-lg transition transform active:scale-95 flex justify-center items-center gap-2 text-sm">
+                        <i class="fa-solid fa-paper-plane"></i> KIRIM LAPORAN
                     </button>
                 </form>
             </div>
 
-            <!-- Kanan: Daftar Laporan -->
+            <!-- Kanan: Daftar Arsip Laporan -->
             <div class="w-full lg:w-2/3 bg-white p-6 overflow-y-auto">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h4 class="font-bold text-gray-800 flex items-center gap-2">
-                        <i class="fa-solid fa-folder-tree text-yellow-600"></i> Arsip Laporan Masuk
+                <div class="flex justify-between items-center mb-6 border-b pb-3">
+                    <h4 class="font-bold text-gray-800 flex items-center gap-2 text-lg uppercase tracking-tight">
+                        <i class="fa-solid fa-folder-tree text-yellow-600"></i> Berkas Arsip Kegiatan
                     </h4>
-                    <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded" id="reportCount">0 File</span>
+                    <span class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold font-mono" id="reportCount">0 Berkas</span>
                 </div>
 
                 <div class="space-y-3" id="reportsList">
-                    <!-- List will be populated by JS -->
-                    <p class="text-center text-gray-400 py-10">Memuat data...</p>
+                    <!-- Dinamis via JavaScript -->
+                    <p class="text-center text-gray-400 py-10 italic">Memuat arsip laporan...</p>
                 </div>
             </div>
         </div>
@@ -133,54 +162,81 @@
 </div>
 
 <script>
+    // Ambil data dari Controller
     const activitiesData = @json($activities);
 
+    /**
+     * Membuka modal dan mengisi data secara dinamis
+     */
     function openModal(id) {
         const activity = activitiesData.find(a => a.id === id);
         if(!activity) return;
 
+        // 1. Update Header Info
         document.getElementById('modalTitle').innerText = activity.title;
-        document.getElementById('modalDate').innerText = 'Pelaksanaan: ' + (activity.date || '-');
+
+        const start = activity.start_date ? new Date(activity.start_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long'}) : '?';
+        const end = activity.end_date ? new Date(activity.end_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '?';
+        document.getElementById('modalDateRange').innerHTML = `<i class="fa-regular fa-calendar-check mr-1"></i> Pelaksanaan: ${start} s/d ${end}`;
+
+        // 2. Set Hidden ID untuk Form
         document.getElementById('formActivityId').value = activity.id;
 
+        // 3. Populate Pegawai Terlibat
+        const involvedDiv = document.getElementById('modalInvolvedList');
+        involvedDiv.innerHTML = activity.involved_employees && activity.involved_employees.length > 0
+            ? activity.involved_employees.map(e => `
+                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-[10px] font-bold border border-blue-200">
+                    <i class="fa-solid fa-user-check text-[8px] mr-1"></i>${e.name}
+                </span>
+              `).join('')
+            : '<span class="text-xs text-gray-400 italic">Terbuka bagi seluruh pegawai</span>';
+
+        // 4. Populate Daftar Laporan
         const listContainer = document.getElementById('reportsList');
-        const reportCount = document.getElementById('reportCount');
+        const reportCountSpan = document.getElementById('reportCount');
 
+        const reports = activity.reports || [];
+        reportCountSpan.innerText = reports.length + ' Berkas';
         listContainer.innerHTML = '';
-        reportCount.innerText = activity.reports.length + ' File';
 
-        if (activity.reports.length === 0) {
+        if (reports.length === 0) {
             listContainer.innerHTML = `
-                <div class="text-center py-12 border-2 border-dashed border-gray-100 rounded-lg">
-                    <i class="fa-regular fa-folder-open text-3xl text-gray-300 mb-2"></i>
-                    <p class="text-gray-400 text-sm">Belum ada laporan untuk kegiatan ini.</p>
+                <div class="text-center py-20 border-2 border-dashed border-gray-100 rounded-xl text-gray-300">
+                    <i class="fa-regular fa-folder-open text-5xl mb-3 block"></i>
+                    <p class="text-sm font-medium">Belum ada laporan yang diunggah untuk kegiatan ini.</p>
                 </div>`;
         } else {
-            activity.reports.forEach(report => {
+            reports.forEach(report => {
+                // Tentukan desain berdasarkan tipe dokumen
                 let iconColor = 'bg-blue-100 text-blue-600';
                 let icon = 'fa-file-lines';
                 if(report.type === 'Keuangan') { iconColor = 'bg-green-100 text-green-600'; icon = 'fa-file-invoice-dollar'; }
                 else if(report.type === 'Dokumentasi') { iconColor = 'bg-purple-100 text-purple-600'; icon = 'fa-images'; }
 
-                const date = new Date(report.created_at);
-                const dateStr = date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+                const uploadDate = new Date(report.created_at).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'});
+                const uploader = report.user ? report.user.name : 'Unknown';
 
                 const html = `
-                    <div class="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-blue-50 transition group">
-                        <div class="flex items-center gap-3">
-                            <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0">
+                    <div class="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-blue-50 transition group shadow-sm">
+                        <div class="flex items-center gap-4 overflow-hidden">
+                            <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0 text-lg shadow-sm">
                                 <i class="fa-solid ${icon}"></i>
                             </div>
-                            <div>
-                                <h5 class="font-bold text-gray-800 text-sm group-hover:text-blue-800">${report.title}</h5>
-                                <div class="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                    <span class="font-semibold text-gray-600"><i class="fa-solid fa-user text-[10px] mr-1"></i>${report.user.name}</span>
+                            <div class="min-w-0">
+                                <h5 class="font-bold text-gray-800 text-sm uppercase tracking-tight truncate group-hover:text-blue-900">${report.title}</h5>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500 mt-1">
+                                    <span class="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">${uploader}</span>
                                     <span>•</span>
-                                    <span>${dateStr}</span>
+                                    <span>${uploadDate}</span>
+                                    <span>•</span>
+                                    <span class="font-bold text-blue-600">${report.type}</span>
                                 </div>
                             </div>
                         </div>
-                        <a href="/reports/${report.id}/download" class="text-gray-400 hover:text-blue-600 hover:bg-white p-2 rounded-full transition shadow-sm border border-transparent hover:border-gray-200">
+                        <a href="/reports/${report.id}/download"
+                           class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-50 text-blue-700 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100"
+                           title="Unduh Berkas">
                             <i class="fa-solid fa-download"></i>
                         </a>
                     </div>
@@ -189,8 +245,10 @@
             });
         }
 
+        // Tampilkan Modal dengan Animasi
         const modal = document.getElementById('activityModal');
         const content = document.getElementById('modalContent');
+
         modal.classList.remove('hidden');
         setTimeout(() => {
             modal.classList.remove('opacity-0');
@@ -199,19 +257,41 @@
         }, 10);
     }
 
+    /**
+     * Menutup modal
+     */
     function closeModal() {
         const modal = document.getElementById('activityModal');
         const content = document.getElementById('modalContent');
+
         modal.classList.add('opacity-0');
         content.classList.remove('scale-100');
         content.classList.add('scale-95');
+
         setTimeout(() => {
             modal.classList.add('hidden');
         }, 300);
     }
 
+    // Event: Tutup modal saat klik area luar (overlay)
     document.getElementById('activityModal').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
+
+    // Event: Esc key untuk tutup modal
+    document.addEventListener('keydown', function(e) {
+        if (e.key === "Escape") closeModal();
+    });
 </script>
+
+<style>
+    /* Animasi fade in lembut */
+    .animate-fade-in {
+        animation: fadeIn 0.4s ease-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
 @endsection
