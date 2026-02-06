@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -10,69 +11,77 @@ use Illuminate\Support\Facades\Hash;
 
 class DashboardController extends Controller
 {
-    public function index() {
-        // SUDAH BENAR: with(['reports.user']) diperlukan untuk modal detail
-        $activities = Activity::with(['reports.user'])->latest('date')->get();
+    public function index()
+    {
+        // Ambil data aktiviti bersama laporan dan kakitangan yang terlibat
+        $activities = Activity::with(['reports.user', 'involvedEmployees'])->latest()->get();
+
+        // Ambil senarai kakitangan untuk pengurusan akaun
+        $users = User::where('role', 'pegawai')->get();
 
         if (Auth::user()->role == 'admin') {
             $totalReports = Report::count();
-            // PASTIKAN: File blade Anda ada di folder resources/views/dashboard/admin.blade.php
-            return view('dashboard.admin', compact('activities', 'totalReports'));
+            return view('dashboard.admin', compact('activities', 'totalReports', 'users'));
         } else {
             return view('dashboard.pegawai', compact('activities'));
         }
     }
 
-    // Fungsi Admin Tambah Kegiatan
-    public function storeActivity(Request $request) {
+    // --- PENGURUSAN AKTIVITI ---
+
+    public function storeActivity(Request $request)
+    {
         $request->validate([
-            'title' => 'required',
+            'title' => 'required|string|max:255',
             'status' => 'required',
-            'date' => 'required|date', // Tambahkan validasi tanggal agar aman
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
         ]);
-        
-        Activity::create($request->all());
-        
-        return back()->with('success', 'Kegiatan dibuat!');
+
+        $activity = Activity::create($request->only(['title', 'description', 'start_date', 'end_date', 'status']));
+
+        // Simpan kakitangan yang terlibat (Relasi Many-to-Many)
+        if ($request->has('involved_users')) {
+            $activity->involvedEmployees()->attach($request->involved_users);
+        }
+
+        return back()->with('success', 'Kegiatan baru berhasil ditambahkan!');
     }
 
-    // Fungsi Admin Edit Kegiatan
-    public function updateActivity(Request $request, $id) {
+    public function updateActivity(Request $request, $id)
+    {
         if (Auth::user()->role !== 'admin') abort(403);
 
         $request->validate([
-            'title' => 'required',
+            'title' => 'required|string|max:255',
             'status' => 'required',
-            'date' => 'nullable|date',
         ]);
 
         $activity = Activity::findOrFail($id);
-        $activity->update($request->all());
+        $activity->update($request->only(['title', 'description', 'start_date', 'end_date', 'status']));
+
+        // Kemas kini kakitangan yang terlibat
+        $activity->involvedEmployees()->sync($request->involved_users ?? []);
 
         return back()->with('success', 'Data kegiatan berhasil diperbarui!');
     }
 
-    // Fungsi Admin Hapus Kegiatan
-    public function destroyActivity($id) {
+    public function destroyActivity($id)
+    {
         if (Auth::user()->role !== 'admin') abort(403);
-
-        $activity = Activity::findOrFail($id);
-        
-        // Opsional: Hapus file fisik laporan jika ada, sebelum hapus record DB
-        // (Logic penghapusan file bisa ditambahkan di sini jika perlu)
-        
-        $activity->delete();
-
+        Activity::findOrFail($id)->delete();
         return back()->with('success', 'Kegiatan berhasil dihapus.');
     }
 
-    // Fungsi Admin Tambah Pegawai
-    public function storeUser(Request $request) {
+    // --- PENGURUSAN KAKITANGAN (PEGAWAI) ---
+
+    public function storeUser(Request $request)
+    {
         if (Auth::user()->role !== 'admin') abort(403);
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'username' => 'required|string|unique:users',
+            'username' => 'required|string|unique:users,username',
             'password' => 'required|string|min:6'
         ]);
 
@@ -83,6 +92,41 @@ class DashboardController extends Controller
             'role' => 'pegawai'
         ]);
 
-        return back()->with('success', 'Pegawai baru berhasil ditambahkan.');
+        return back()->with('success', 'User baru berhasil ditambahkan!');
+    }
+
+    public function updateUser(Request $request, $id)
+    {
+        if (Auth::user()->role !== 'admin') abort(403);
+
+        $user = User::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|unique:users,username,' . $user->id,
+        ]);
+
+        $data = [
+            'name' => $request->name,
+            'username' => $request->username
+        ];
+
+        // Tukar kata laluan hanya jika ruangan diisi
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        $user->update($data);
+        return back()->with('success', 'Data user berhasil di perbarui!');
+    }
+
+    public function destroyUser($id)
+    {
+        if (Auth::user()->role !== 'admin') abort(403);
+
+        $user = User::findOrFail($id);
+        $user->delete();
+
+        return back()->with('success', 'Akun user berhasil dihapus.');
     }
 }
