@@ -24,6 +24,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/activities/{id}', [DashboardController::class, 'destroyActivity'])->name('activities.destroy');
     Route::put('/users/{id}', [DashboardController::class, 'updateUser'])->name('users.update');
     Route::delete('/users/{id}', [DashboardController::class, 'destroyUser'])->name('users.destroy');
+    Route::get('/activities/{id}/download-all', [App\Http\Controllers\ReportController::class, 'downloadEventReports'])->name('activities.downloadAll');
 
     // Admin User Management
     Route::post('/users', [DashboardController::class, 'storeUser'])->name('users.store');

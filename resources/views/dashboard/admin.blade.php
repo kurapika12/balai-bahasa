@@ -291,6 +291,16 @@
                     <button id="btnEditActivity" class="w-full bg-white border-2 border-yellow-500 text-yellow-600 hover:bg-yellow-500 hover:text-white font-bold py-2 rounded-lg transition shadow-sm flex justify-center items-center gap-2">
                         <i class="fa-solid fa-pen-to-square"></i> Edit Data Kegiatan
                     </button>
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <h4 class="font-bold text-gray-700 text-xs uppercase mb-3">Unduh Semua</h4>
+                        <!-- Tombol Download ZIP -->
+                        <a id="btnDownloadAll" href="#" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded-lg transition shadow-sm flex justify-center items-center gap-2 text-sm">
+                            <i class="fa-solid fa-file-zipper"></i> Download Laporan Event
+                        </a>
+                        <p class="text-[10px] text-gray-400 mt-2 italic text-center">
+                            * File akan dikelompokkan otomatis ke dalam folder Narasi, Keuangan, dan Dokumentasi.
+                        </p>
+                    </div>
                 </div>
 
                 <div class="mt-8 pt-6 border-t border-red-200">
@@ -440,6 +450,8 @@
         document.getElementById('admModalDate').innerText = `Periode: ${startDate} s/d ${endDate}`;
         document.getElementById('admModalDesc').innerText = activity.description || 'Tidak ada deskripsi tambahan.';
         document.getElementById('admModalStatus').innerText = activity.status;
+        // baris ini untuk update link download ZIP dengan ID kegiatan yang sesuai
+        document.getElementById('btnDownloadAll').href = `/activities/${activity.id}/download-all`;
 
         // 2. Involved Employees
         const involvedDiv = document.getElementById('admModalInvolved');
