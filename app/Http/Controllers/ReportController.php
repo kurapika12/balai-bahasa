@@ -7,6 +7,7 @@ use App\Models\Report;
 use App\Models\Activity;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -22,7 +23,7 @@ class ReportController extends Controller
         ]);
 
         $file = $request->file('file');
-        $originalName = $file->getClientOriginalName(); 
+        $originalName = $file->getClientOriginalName();
         $path = $file->store('reports', 'public');
 
         Report::create([
@@ -32,7 +33,8 @@ class ReportController extends Controller
             'type' => $request->type,
             'description' => $request->description,
             'file_path' => $path,
-            'original_filename' => $originalName
+            'original_filename' => $originalName,
+            'executive_summary' => $request->executive_summary // Menyimpan hasil ringkasan eksekutif
         ]);
 
         return back()->with('success', 'Laporan berhasil diunggah!');
@@ -107,6 +109,138 @@ class ReportController extends Controller
 
         // 6. Kirim file ZIP ke browser dan hapus setelah terkirim
         return response()->download($zipPath)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Membaca isi file (DOCX/PDF/Gambar) dan membuat Ringkasan Eksekutif Otomatis menggunakan Gemini API
+     * VERSI PINTAR: Mendukung auto-fallback model dari gemini-2.5-flash ke gemini-1.5-flash jika tidak terdaftar
+     */
+    public function summarize(Request $request) {
+        $request->validate([
+            'file' => 'required|file|max:10240'
+        ]);
+
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $apiKey = env('GEMINI_API_KEY');
+        
+        if (!$apiKey) {
+            return response()->json(['success' => false, 'message' => 'Konfigurasi GEMINI_API_KEY tidak ditemukan dalam file .env proyek Anda.'], 500);
+        }
+
+        $textToSummarize = "";
+        $useDirectGemini = false;
+
+        // 1. Ekstraksi teks mandiri dari file Word (.docx) & Teks (.txt)
+        if ($extension === 'docx') {
+            if (class_exists(\ZipArchive::class)) {
+                $zip = new \ZipArchive;
+                if ($zip->open($file->getRealPath()) === true) {
+                    if (($index = $zip->locateName('word/document.xml')) !== false) {
+                        $xmlContent = $zip->getFromIndex($index);
+                        // Bersihkan tag XML untuk mendapatkan isi tulisan murni
+                        $textToSummarize = html_entity_decode(strip_tags($xmlContent));
+                    }
+                    $zip->close();
+                }
+            } else {
+                // Jika ekstensi ZipArchive PHP mati, kirim langsung ke Gemini sebagai fallback
+                $useDirectGemini = true;
+            }
+        } elseif ($extension === 'txt') {
+            $textToSummarize = file_get_contents($file->getRealPath());
+        } else {
+            // PDF & Gambar dikirim langsung menggunakan Model Visi Gemini
+            $useDirectGemini = true;
+        }
+
+        // 2. Prompt Standar Operasional Prosedur (SOP) Birokrasi Pemerintahan Indonesia
+        $prompt = "Tugas Anda adalah merangkum laporan administrasi kantor dinas instansi pemerintah. 
+                   Buatlah Ringkasan Eksekutif (Executive Summary) yang formal, baku, dan profesional dari dokumen berikut dalam 1-2 paragraf padat (maksimal 120 kata).
+                   
+                   STRUKTUR WAJIB YANG HARUS ADA:
+                   - Paragraf Awal: Deskripsikan pelaksanaan kegiatan secara formal (Nama agenda, waktu, dan tempat pelaksanaan).
+                   - Paragraf Tengah: Jabarkan pencapaian riil atau hasil nyata dari kegiatan tersebut secara objektif.
+                   - Paragraf Akhir: Sebutkan kendala lapangan yang dihadapi dan berikan satu rekomendasi perbaikan untuk pimpinan.
+
+                   Gunakan Bahasa Indonesia yang sangat formal, baku, santun, dan langsung pada intinya.";
+
+        // Daftar model yang akan dicoba secara berurutan (Model Baru -> Model Lama)
+        $modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+        $response = null;
+        $success = false;
+        $lastErrorMessage = 'Gagal memproses AI.';
+
+        // 3. Eksekusi Request dengan Multi-Model Fallback
+        foreach ($modelsToTry as $modelName) {
+            $url = "https://generativelanguage.googleapis.com/v1/models/{$modelName}:generateContent?key={$apiKey}";
+
+            try {
+                if ($useDirectGemini) {
+                    $fileData = base64_encode(file_get_contents($file));
+                    $mimeType = $file->getMimeType();
+
+                    $response = Http::withoutVerifying()
+                        ->timeout(60)
+                        ->post($url, [
+                            "contents" => [["parts" => [
+                                ["text" => $prompt],
+                                ["inline_data" => ["mime_type" => $mimeType, "data" => $fileData]]
+                            ]]]
+                        ]);
+                } else {
+                    if (empty(trim($textToSummarize))) {
+                        $textToSummarize = "Dokumen Word kosong atau tidak dapat diekstrak teksnya.";
+                    }
+
+                    $response = Http::withoutVerifying()
+                        ->timeout(60)
+                        ->post($url, [
+                            "contents" => [["parts" => [
+                                ["text" => $prompt . "\n\nIsi Dokumen Mentah:\n" . Str::limit($textToSummarize, 8000)]
+                            ]]]
+                        ]);
+                }
+
+                // Periksa apakah respons dari server Google sukses
+                if ($response->successful()) {
+                    $success = true;
+                    break; // Berhasil! Keluar dari loop pencarian model
+                } else {
+                    $errorBody = $response->json();
+                    $lastErrorMessage = isset($errorBody['error']['message']) ? $errorBody['error']['message'] : 'Respons tidak dikenal.';
+                    
+                    // Jika kesalahan karena model tidak ditemukan/tidak didukung, coba model berikutnya di dalam daftar loop
+                    if (Str::contains(strtolower($lastErrorMessage), ['not found', 'not supported', 'unsupported'])) {
+                        continue;
+                    }
+                    
+                    // Jika kesalahan lain (misalnya API key salah atau kuota habis), hentikan loop agar pesan error tampil
+                    break;
+                }
+            } catch (\Exception $e) {
+                $lastErrorMessage = $e->getMessage();
+                continue; // Terjadi kendala jaringan/koneksi, coba model berikutnya
+            }
+        }
+
+        // 4. Pengiriman Respon Akhir ke Frontend
+        if ($success && $response) {
+            $summaryResult = $response->json('candidates.0.content.parts.0.text');
+            
+            // Hilangkan format tebal markdown (*) agar teks nyaman diedit langsung oleh pegawai
+            $cleanSummary = trim(str_replace(['*', '#', '_'], '', $summaryResult));
+
+            return response()->json([
+                'success' => true,
+                'summary' => $cleanSummary
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Validasi gagal di semua model: ' . $lastErrorMessage
+        ], 400);
     }
 
     public function destroy($id) {

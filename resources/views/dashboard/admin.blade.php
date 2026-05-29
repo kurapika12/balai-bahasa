@@ -27,7 +27,7 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-600
-            transition transform hover:-translate-y-1 hover:shadow-md">
+            transition transform hover:-translate-y-1 hover:shadow-md flex items-center justify-between">
             <div>
                 <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">Total Kegiatan</p>
                 <h3 class="text-3xl font-bold text-gray-800 mt-1">{{ $activities->count() }}</h3>
@@ -36,8 +36,8 @@
                 <i class="fa-regular fa-calendar-check"></i>
             </div>
         </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-600
-            transition transform hover:-translate-y-1 hover:shadow-md">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-green-600
+            transition transform hover:-translate-y-1 hover:shadow-md flex items-center justify-between">
             <div>
                 <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">Laporan Masuk</p>
                 <h3 class="text-3xl font-bold text-gray-800 mt-1">{{ $totalReports }}</h3>
@@ -46,8 +46,8 @@
                 <i class="fa-solid fa-box-archive"></i>
             </div>
         </div>
-            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-600
-            transition transform hover:-translate-y-1 hover:shadow-md">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-yellow-500
+            transition transform hover:-translate-y-1 hover:shadow-md flex items-center justify-between">
             <div>
                 <p class="text-gray-500 text-xs font-bold uppercase tracking-wider">Pegawai Aktif</p>
                 <h3 class="text-3xl font-bold text-gray-800 mt-1">{{ $users->count() }}</h3>
@@ -92,7 +92,7 @@
                         </span>
                     </div>
                     <h4 class="font-bold text-lg text-gray-800 mb-2 line-clamp-2
-           group-hover:text-blue-900 transition-colors duration-300">{{ $activity->title }}</h4>
+                    group-hover:text-blue-900 transition-colors duration-300">{{ $activity->title }}</h4>
                     <p class="text-gray-500 text-sm line-clamp-2">{{ $activity->description }}</p>
 
                     <!-- Terlibat Count -->
@@ -155,8 +155,8 @@
                             <div class="text-sm font-bold text-gray-800">{{ $user->name }}</div>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono bg-gray-50 px-2 py-1 rounded w-fit">
-                        {{ $user->username }}
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
+                        <span class="bg-gray-50 px-2 py-1 rounded">{{ $user->username }}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 inline-flex text-[10px] leading-5 font-bold rounded-full bg-green-100 text-green-800 uppercase border border-green-200">Aktif</span>
@@ -370,7 +370,7 @@
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Pembaruan Pegawai Terlibat</label>
+                <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Pembalasan Pegawai Terlibat</label>
                 <div class="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto border p-2 rounded bg-gray-50 border-gray-200" id="editInvolvedList">
                     @foreach($users as $user)
                     <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" name="involved_users[]" value="{{ $user->id }}" class="edit-checkbox rounded" data-user-id="{{ $user->id }}"> {{ $user->name }}</label>
@@ -450,7 +450,6 @@
         document.getElementById('admModalDate').innerText = `Periode: ${startDate} s/d ${endDate}`;
         document.getElementById('admModalDesc').innerText = activity.description || 'Tidak ada deskripsi tambahan.';
         document.getElementById('admModalStatus').innerText = activity.status;
-        // baris ini untuk update link download ZIP dengan ID kegiatan yang sesuai
         document.getElementById('btnDownloadAll').href = `/activities/${activity.id}/download-all`;
 
         // 2. Involved Employees
@@ -514,7 +513,8 @@
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="showReportDetail('${report.title}', '${report.type}', '${report.user.name}', '${report.description || 'Tidak ada keterangan'}', '/reports/${report.id}/download')" class="h-8 w-8 flex items-center justify-center bg-gray-100 hover:bg-yellow-100 hover:text-yellow-600 text-gray-500 rounded transition shadow-sm"><i class="fa-solid fa-eye"></i></button>
+                            <!-- Tombol Mata Berubah Mengirimkan Parameter ID Berkas (Mencegah Quote-Breaking bug) -->
+                            <button onclick="showReportDetail(${report.id}, '/reports/${report.id}/download')" class="h-8 w-8 flex items-center justify-center bg-gray-100 hover:bg-yellow-100 hover:text-yellow-600 text-gray-500 rounded transition shadow-sm" title="Pratinjau & Ringkasan AI"><i class="fa-solid fa-eye"></i></button>
                             <a href="/reports/${report.id}/download" class="h-8 w-8 flex items-center justify-center bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 rounded transition shadow-sm"><i class="fa-solid fa-download"></i></a>
                             <button onclick="confirmDeleteReport(${report.id})" class="h-8 w-8 flex items-center justify-center bg-red-50 hover:bg-red-600 hover:text-white text-red-600 rounded transition shadow-sm"><i class="fa-solid fa-trash"></i></button>
                         </div>
@@ -549,23 +549,125 @@
         document.getElementById('modalEditUser').classList.remove('hidden');
     }
 
-    function showReportDetail(title, type, user, desc, downloadUrl) {
+    /**
+     * Tampilan Detail Berkas Cerdas (Swal) yang menampilkan Textarea Ringkasan AI yang dapat diedit langsung
+     */
+    function showReportDetail(reportId, downloadUrl) {
+        // Cari objek berkas laporan di dalam data aktivitas lokal secara aman
+        let report = null;
+        for (const activity of activitiesData) {
+            report = activity.reports.find(r => r.id === reportId);
+            if (report) break;
+        }
+        
+        if (!report) return;
+
+        const title = report.title;
+        const type = report.type;
+        const user = report.user ? report.user.name : 'Unknown';
+        const desc = report.description || 'Tidak ada keterangan tambahan.';
+        const summary = report.executive_summary || 'Belum ada ringkasan eksekutif (AI) untuk berkas laporan ini.';
+
         Swal.fire({
-            title: `<div class="text-lg font-bold text-blue-900">${title}</div>`,
+            title: `<div class="text-base font-bold text-blue-900 flex items-center gap-2"><i class="fa-solid fa-circle-nodes text-blue-600 animate-pulse"></i> Pratinjau & Ringkasan Berkas</div>`,
             html: `
-                <div class="text-left text-xs text-gray-600 p-2 border-t mt-4">
-                    <div class="flex justify-between mb-2"><span>Jenis:</span> <span class="font-bold">${type}</span></div>
-                    <div class="flex justify-between mb-2"><span>Pengirim:</span> <span class="font-bold">${user}</span></div>
-                    <div class="mt-4 font-bold uppercase text-gray-400">Keterangan:</div>
-                    <div class="p-3 bg-gray-50 border rounded mt-1 italic">${desc}</div>
-                    <a href="${downloadUrl}" class="flex items-center justify-center w-full gap-2 mt-6 py-2.5 bg-blue-900 text-white rounded-lg font-bold shadow-md hover:bg-blue-800 transition">
-                        <i class="fa-solid fa-download"></i> Unduh File Laporan
-                    </a>
+                <div class="text-left text-xs text-gray-600 p-2 border-t mt-4 space-y-4">
+                    <!-- Metadata Info -->
+                    <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100 shadow-sm">
+                        <div class="col-span-2 border-b border-gray-200 pb-1 mb-1">
+                            <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Judul Berkas</span>
+                            <span class="font-bold text-gray-800 break-words text-xs uppercase">${title}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Kategori Laporan</span>
+                            <span class="font-semibold text-gray-700 bg-blue-50 px-2 py-0.5 border rounded-full border-blue-100">${type}</span>
+                        </div>
+                        <div>
+                            <span class="block text-[9px] text-gray-400 font-bold uppercase tracking-wider">Pengirim / Pegawai</span>
+                            <span class="font-bold text-gray-700">${user}</span>
+                        </div>
+                    </div>
+
+                    <!-- Keterangan Pegawai -->
+                    <div>
+                        <span class="block text-[10px] font-bold text-gray-400 uppercase mb-1"><i class="fa-solid fa-comment-dots text-gray-400"></i> Keterangan Instansi:</span>
+                        <div class="p-3 bg-gray-50 border rounded-lg italic text-gray-700 leading-relaxed">${desc}</div>
+                    </div>
+
+                    <!-- TEXTAREA UNTUK MENAMPILKAN & MENGEDIT RINGKASAN AI -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-blue-900 uppercase mb-1 flex items-center justify-between">
+                            <span><i class="fa-solid fa-robot text-blue-600"></i> Ringkasan Eksekutif (AI)</span>
+                            <span class="text-[8px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Bisa Diedit Admin</span>
+                        </label>
+                        <form id="formUpdateSummary" onsubmit="handleUpdateSummary(event, ${reportId})">
+                            <textarea id="admExecutiveSummary" name="executive_summary" rows="5" class="w-full border-gray-300 rounded-lg shadow-sm text-xs p-3 border bg-white focus:ring-blue-500 focus:border-blue-500 font-medium leading-relaxed" placeholder="Tulis atau edit ringkasan laporan..." required>${summary}</textarea>
+                            
+                            <div class="mt-4 flex justify-between items-center gap-2">
+                                <a href="${downloadUrl}" class="flex items-center justify-center gap-2 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold border text-xs transition">
+                                    <i class="fa-solid fa-download"></i> Unduh Berkas
+                                </a>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             `,
             showConfirmButton: false,
             showCloseButton: true
         });
+    }
+
+    /**
+     * Handler untuk menyimpan ringkasan yang telah disunting oleh Admin
+     */
+    async function handleUpdateSummary(e, reportId) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSaveSummary');
+        const summaryValue = document.getElementById('admExecutiveSummary').value;
+
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Menyimpan...`;
+
+        const formData = new FormData();
+        formData.append('executive_summary', summaryValue);
+        formData.append('_token', '{{ csrf_token() }}');
+
+        try {
+            // Mengirimkan pembaruan ringkasan langsung ke Controller
+            const response = await fetch(`/reports/${reportId}/update-summary`, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                // Perbarui data lokal (activitiesData) secara instan agar tidak perlu reload halaman
+                activitiesData.forEach(act => {
+                    const rep = act.reports.find(r => r.id === reportId);
+                    if (rep) {
+                        rep.executive_summary = summaryValue;
+                    }
+                });
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil Disimpan',
+                    text: 'Ringkasan eksekutif berhasil diperbarui dan dikunci dalam database.',
+                    confirmButtonColor: '#1e3a8a'
+                });
+            } else {
+                throw new Error(result.message || "Gagal memperbarui database.");
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menyimpan',
+                text: error.message || 'Terjadi hambatan koneksi saat mengirim data.',
+                confirmButtonColor: '#1e3a8a'
+            });
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Simpan Ringkasan`;
+        }
     }
 
     function confirmDeleteActivity(button) {
@@ -609,7 +711,7 @@
         }).then((res) => { if(res.isConfirmed) form.submit(); });
     }
 
-    // Modal click-outside logic
+    // Modal click-outside a
     window.onclick = function(e) {
         if(e.target.id === 'adminModal') closeAdminModal();
         if(e.target.id === 'modalNewActivity') e.target.classList.add('hidden');

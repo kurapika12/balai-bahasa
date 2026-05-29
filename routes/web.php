@@ -31,4 +31,5 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/reports/{id}', [ReportController::class, 'destroy'])->name('reports.destroy');
     Route::get('/reports/{id}/download', [ReportController::class, 'download'])->name('reports.download');
+    Route::post('/reports/summarize', [App\Http\Controllers\ReportController::class, 'summarize'])->name('reports.summarize');
 });

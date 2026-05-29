@@ -23,13 +23,13 @@
     <div class="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition duration-300 transform hover:-translate-y-1 flex flex-col h-full group">
         <!-- Card Header Accent -->
         <div class="h-3 bg-blue-900 group-hover:bg-yellow-500 transition-colors duration-300"></div>
-
+        
         <div class="p-6 flex-grow">
             <div class="flex items-center justify-between mb-4">
                  <!-- Date Range Badge -->
                  <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full border border-blue-100">
-                    <i class="fa-regular fa-calendar mr-1"></i>
-                    {{ $activity->start_date ? \Carbon\Carbon::parse($activity->start_date)->format('d M') : '?' }} -
+                    <i class="fa-regular fa-calendar mr-1"></i> 
+                    {{ $activity->start_date ? \Carbon\Carbon::parse($activity->start_date)->format('d M') : '?' }} - 
                     {{ $activity->end_date ? \Carbon\Carbon::parse($activity->end_date)->format('d M Y') : '?' }}
                 </span>
 
@@ -47,7 +47,7 @@
 
             <h3 class="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-900 transition">{{ $activity->title }}</h3>
             <p class="text-gray-600 text-sm line-clamp-3 leading-relaxed mb-4">{{ $activity->description }}</p>
-
+            
             <!-- Involved Peek -->
             <div class="flex items-center gap-2 text-xs text-gray-400 font-medium">
                 <i class="fa-solid fa-users"></i>
@@ -62,12 +62,7 @@
         </div>
     </div>
     @empty
-    <div class="col-span-full text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200">
-        <div class="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300"></i>
-        </div>
-        <p class="text-gray-500 font-medium tracking-tight">Belum ada agenda kegiatan yang tersedia saat ini.</p>
-    </div>
+    <div class="col-span-full text-center py-16 bg-white rounded-xl border-2 border-dashed border-gray-200 text-gray-400">Belum ada agenda kegiatan.</div>
     @endforelse
 </div>
 
@@ -91,7 +86,7 @@
 
             <!-- Kiri: Info & Form Unggah -->
             <div class="w-full lg:w-1/3 bg-gray-50 p-6 overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200">
-
+                
                 <!-- Pegawai Terlibat Section -->
                 <div class="mb-8">
                     <h4 class="font-bold text-gray-700 uppercase tracking-widest text-[10px] mb-3 flex items-center gap-2">
@@ -108,7 +103,7 @@
                     <i class="fa-solid fa-cloud-arrow-up"></i> Unggah Laporan Baru
                 </h4>
 
-                <form action="{{ route('reports.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <form id="uploadForm" action="{{ route('reports.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
                     @csrf
                     <input type="hidden" name="activity_id" id="formActivityId">
 
@@ -119,7 +114,7 @@
 
                     <div>
                         <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Jenis Dokumen</label>
-                        <select name="type" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2.5 border bg-white">
+                        <select name="type" id="reportType" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2.5 border bg-white">
                             <option value="Narasi">Narasi / Notula</option>
                             <option value="Keuangan">Keuangan / Nota</option>
                             <option value="Dokumentasi">Dokumentasi / Foto</option>
@@ -128,8 +123,25 @@
 
                     <div class="bg-white p-4 rounded-lg border-2 border-dashed border-gray-200 hover:border-blue-400 transition cursor-pointer relative group">
                         <label class="block text-[10px] font-bold text-gray-500 uppercase mb-2">Berkas Laporan</label>
-                        <input type="file" name="file" class="w-full text-xs text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
+                        <input type="file" id="fileInput" name="file" class="w-full text-xs text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" required>
                         <p class="text-[9px] text-gray-400 mt-2 italic">* PDF, DOCX, JPG, XLSX (Maks. 10MB)</p>
+                    </div>
+
+                    <!-- FITUR EDITABLE TEXTAREA RINGKASAN AI -->
+                    <div class="relative">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1 flex items-center justify-between">
+                            <span>Ringkasan Eksekutif (AI)</span>
+                            <span class="text-[8px] bg-blue-100 text-blue-700 px-1.5 rounded-full font-bold">Dapat Diedit</span>
+                        </label>
+                        <textarea name="executive_summary" id="executiveSummary" rows="4" class="w-full border-gray-300 rounded-md shadow-sm text-xs p-2.5 border bg-white focus:ring-blue-500 focus:border-blue-500 font-medium leading-relaxed" placeholder="Unggah berkas untuk membuat ringkasan eksekutif otomatis oleh AI..."></textarea>
+                        
+                        <!-- Overlay Loading Ringkasan -->
+                        <div id="summaryLoading" class="hidden absolute inset-0 bg-gray-50 bg-opacity-90 flex flex-col items-center justify-center rounded-md border border-blue-200">
+                            <span class="text-[10px] font-bold text-blue-900 flex items-center gap-2 animate-pulse mb-1">
+                                <i class="fa-solid fa-robot animate-spin"></i> AI Sedang Membaca Dokumen...
+                            </span>
+                            <span class="text-[8px] text-gray-400">Sedang menyusun ringkasan formal...</span>
+                        </div>
                     </div>
 
                     <div>
@@ -137,7 +149,7 @@
                         <textarea name="description" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-xs p-2.5 border" placeholder="Catatan tambahan mengenai berkas ini..."></textarea>
                     </div>
 
-                    <button class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 rounded-lg shadow-lg transition transform active:scale-95 flex justify-center items-center gap-2 text-sm">
+                    <button type="submit" id="submitBtn" class="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 rounded-lg shadow-lg transition transform active:scale-95 flex justify-center items-center gap-2 text-sm">
                         <i class="fa-solid fa-paper-plane"></i> KIRIM LAPORAN
                     </button>
                 </form>
@@ -161,94 +173,59 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // Ambil data dari Controller
     const activitiesData = @json($activities);
 
-    /**
-     * Membuka modal dan mengisi data secara dinamis
-     */
     function openModal(id) {
         const activity = activitiesData.find(a => a.id === id);
         if(!activity) return;
 
-        // 1. Update Header Info
         document.getElementById('modalTitle').innerText = activity.title;
-
         const start = activity.start_date ? new Date(activity.start_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long'}) : '?';
         const end = activity.end_date ? new Date(activity.end_date).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '?';
         document.getElementById('modalDateRange').innerHTML = `<i class="fa-regular fa-calendar-check mr-1"></i> Pelaksanaan: ${start} s/d ${end}`;
-
-        // 2. Set Hidden ID untuk Form
         document.getElementById('formActivityId').value = activity.id;
 
-        // 3. Populate Pegawai Terlibat
         const involvedDiv = document.getElementById('modalInvolvedList');
-        involvedDiv.innerHTML = activity.involved_employees && activity.involved_employees.length > 0
-            ? activity.involved_employees.map(e => `
-                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-[10px] font-bold border border-blue-200">
-                    <i class="fa-solid fa-user-check text-[8px] mr-1"></i>${e.name}
-                </span>
-              `).join('')
+        involvedDiv.innerHTML = activity.involved_employees && activity.involved_employees.length > 0 
+            ? activity.involved_employees.map(e => `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-[10px] font-bold border border-blue-200"><i class="fa-solid fa-user-check text-[8px] mr-1"></i>${e.name}</span>`).join('')
             : '<span class="text-xs text-gray-400 italic">Terbuka bagi seluruh pegawai</span>';
 
-        // 4. Populate Daftar Laporan
         const listContainer = document.getElementById('reportsList');
         const reportCountSpan = document.getElementById('reportCount');
-
         const reports = activity.reports || [];
         reportCountSpan.innerText = reports.length + ' Berkas';
         listContainer.innerHTML = '';
 
         if (reports.length === 0) {
-            listContainer.innerHTML = `
-                <div class="text-center py-20 border-2 border-dashed border-gray-100 rounded-xl text-gray-300">
-                    <i class="fa-regular fa-folder-open text-5xl mb-3 block"></i>
-                    <p class="text-sm font-medium">Belum ada laporan yang diunggah untuk kegiatan ini.</p>
-                </div>`;
+            listContainer.innerHTML = `<div class="text-center py-20 border-2 border-dashed border-gray-100 rounded-xl text-gray-300"><i class="fa-regular fa-folder-open text-5xl mb-3 block"></i><p class="text-sm font-medium">Belum ada laporan yang diunggah.</p></div>`;
         } else {
             reports.forEach(report => {
-                // Tentukan desain berdasarkan tipe dokumen
                 let iconColor = 'bg-blue-100 text-blue-600';
                 let icon = 'fa-file-lines';
                 if(report.type === 'Keuangan') { iconColor = 'bg-green-100 text-green-600'; icon = 'fa-file-invoice-dollar'; }
                 else if(report.type === 'Dokumentasi') { iconColor = 'bg-purple-100 text-purple-600'; icon = 'fa-images'; }
-
                 const uploadDate = new Date(report.created_at).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'});
                 const uploader = report.user ? report.user.name : 'Unknown';
 
                 const html = `
                     <div class="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-blue-50 transition group shadow-sm">
                         <div class="flex items-center gap-4 overflow-hidden">
-                            <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0 text-lg shadow-sm">
-                                <i class="fa-solid ${icon}"></i>
-                            </div>
+                            <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0 text-lg shadow-sm"><i class="fa-solid ${icon}"></i></div>
                             <div class="min-w-0">
                                 <h5 class="font-bold text-gray-800 text-sm uppercase tracking-tight truncate group-hover:text-blue-900">${report.title}</h5>
-                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500 mt-1">
-                                    <span class="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">${uploader}</span>
-                                    <span>•</span>
-                                    <span>${uploadDate}</span>
-                                    <span>•</span>
-                                    <span class="font-bold text-blue-600">${report.type}</span>
-                                </div>
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500 mt-1"><span class="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">${uploader}</span><span>•</span><span>${uploadDate}</span><span>•</span><span class="font-bold text-blue-600">${report.type}</span></div>
                             </div>
                         </div>
-                        <a href="/reports/${report.id}/download"
-                           class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-50 text-blue-700 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100"
-                           title="Unduh Berkas">
-                            <i class="fa-solid fa-download"></i>
-                        </a>
-                    </div>
-                `;
+                        <a href="/reports/${report.id}/download" class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-50 text-blue-700 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100"><i class="fa-solid fa-download"></i></a>
+                    </div>`;
                 listContainer.insertAdjacentHTML('beforeend', html);
             });
         }
 
-        // Tampilkan Modal dengan Animasi
         const modal = document.getElementById('activityModal');
         const content = document.getElementById('modalContent');
-
         modal.classList.remove('hidden');
         setTimeout(() => {
             modal.classList.remove('opacity-0');
@@ -257,35 +234,108 @@
         }, 10);
     }
 
-    /**
-     * Menutup modal
-     */
     function closeModal() {
         const modal = document.getElementById('activityModal');
         const content = document.getElementById('modalContent');
-
         modal.classList.add('opacity-0');
         content.classList.remove('scale-100');
         content.classList.add('scale-95');
-
         setTimeout(() => {
             modal.classList.add('hidden');
+            resetAiStatus();
         }, 300);
     }
 
-    // Event: Tutup modal saat klik area luar (overlay)
-    document.getElementById('activityModal').addEventListener('click', function(e) {
-        if (e.target === this) closeModal();
+    // --- INTEGRASI PINTAR AUTOMATIC SUMMARY GENERATOR ---
+    const fileInput = document.getElementById('fileInput');
+    const executiveSummary = document.getElementById('executiveSummary');
+    const summaryLoading = document.getElementById('summaryLoading');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function resetAiStatus() {
+        executiveSummary.value = "";
+        summaryLoading.classList.add('hidden');
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    fileInput.addEventListener('change', async function() {
+        if (!this.files.length) return;
+        
+        const file = this.files[0];
+        
+        // Aktifkan visual loading
+        summaryLoading.classList.remove('hidden');
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        executiveSummary.value = "";
+        executiveSummary.placeholder = "Sistem sedang mengurai berkas, mohon tunggu...";
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('_token', '{{ csrf_token() }}');
+
+        try {
+            const response = await fetch('{{ route('reports.summarize') }}', {
+                method: 'POST',
+                body: formData
+            });
+            
+            // Pengamanan Handshake Server: Cek jika respons tidak sukses (500/400)
+            if (!response.ok) {
+                const rawResponseText = await response.text();
+                let errMsg = "Terjadi kesalahan respons server.";
+                try {
+                    // Coba urai jika respons berformat JSON
+                    const errorObj = JSON.parse(rawResponseText);
+                    errMsg = errorObj.message || errMsg;
+                } catch(parseErr) {
+                    // Jika berupa HTML (error Laravel oranye), ambil baris pertamanya saja
+                    errMsg = rawResponseText.substring(0, 100) + "...";
+                }
+                throw new Error(errMsg);
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Tempelkan draf ringkasan dari AI langsung ke dalam textarea agar bisa dimodifikasi pegawai
+                executiveSummary.value = result.summary;
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Analisis AI Berhasil',
+                    text: 'Draf Ringkasan Eksekutif telah berhasil disiapkan oleh AI. Silakan baca dan sesuaikan teks di atas sebelum dikirim.',
+                    confirmButtonColor: '#1e3a8a'
+                });
+            } else {
+                throw new Error(result.message || "Gagal menyusun ringkasan otomatis.");
+            }
+        } catch (error) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Verifikasi Manual',
+                html: `<div class="text-left text-xs space-y-2">
+                        <p class="font-bold text-red-600">Catatan/Error Terdeteksi:</p>
+                        <p class="bg-gray-100 p-2 rounded font-mono text-[10px] break-all">${error.message}</p>
+                        <p class="text-gray-500">Jangan khawatir, Anda tetap bisa melapor dengan mengisi formulir ringkasan secara manual di layar.</p>
+                       </div>`,
+                confirmButtonColor: '#1e3a8a'
+            });
+            executiveSummary.placeholder = "Tulis ringkasan eksekutif laporan Anda secara manual di sini...";
+        } finally {
+            // Nonaktifkan visual loading
+            summaryLoading.classList.add('hidden');
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     });
 
-    // Event: Esc key untuk tutup modal
-    document.addEventListener('keydown', function(e) {
-        if (e.key === "Escape") closeModal();
-    });
+    document.getElementById('activityModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+    document.addEventListener('keydown', function(e) { if (e.key === "Escape") closeModal(); });
 </script>
 
 <style>
-    /* Animasi fade in lembut */
     .animate-fade-in {
         animation: fadeIn 0.4s ease-out;
     }
