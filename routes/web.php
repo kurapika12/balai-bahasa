@@ -32,4 +32,9 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/reports/{id}', [ReportController::class, 'destroy'])->name('reports.destroy');
     Route::get('/reports/{id}/download', [ReportController::class, 'download'])->name('reports.download');
     Route::post('/reports/summarize', [App\Http\Controllers\ReportController::class, 'summarize'])->name('reports.summarize');
+
+    // Rute-rute baru untuk Approval Workflow
+    Route::patch('/reports/{id}/mark-reviewed', [App\Http\Controllers\ReportController::class, 'markAsReviewed'])->name('reports.markReviewed');
+    Route::patch('/reports/{id}/update-status', [App\Http\Controllers\ReportController::class, 'updateStatus'])->name('reports.updateStatus');
+    Route::post('/reports/{id}/revise', [App\Http\Controllers\ReportController::class, 'revise'])->name('reports.revise');
 });

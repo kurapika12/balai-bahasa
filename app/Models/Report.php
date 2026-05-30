@@ -14,7 +14,9 @@ class Report extends Model
         'file_path', 
         'original_filename', 
         'description', 
-        'executive_summary'
+        'executive_summary',
+        'status',
+        'rejection_note'
     ];
 
     public function user() { return $this->belongsTo(User::class); }

@@ -34,50 +34,45 @@ class ReportController extends Controller
             'description' => $request->description,
             'file_path' => $path,
             'original_filename' => $originalName,
-            'executive_summary' => $request->executive_summary // Menyimpan hasil ringkasan eksekutif
+            'executive_summary' => $request->executive_summary,
+            'status' => 'Submitted' // Default saat pertama diunggah
         ]);
 
-        return back()->with('success', 'Laporan berhasil diunggah!');
+        return back()->with('success', 'Laporan berhasil diunggah dan masuk antrean pemeriksaan!');
     }
 
     /**
-     * Fitur Smart File Organizer: Mengunduh semua laporan dalam satu ZIP yang terorganisir.
+     * Smart File Organizer: HANYA MENGUNDUH LAPORAN YANG SUDAH APPROVED.
      */
     public function downloadEventReports($eventId) {
         if (Auth::user()->role !== 'admin') abort(403);
 
         $activity = Activity::with('reports.user')->findOrFail($eventId);
-        $reports = $activity->reports;
+        // HANYA ambil laporan yang statusnya Approved
+        $reports = $activity->reports()->where('status', 'Approved')->get();
 
         if ($reports->isEmpty()) {
-            return back()->with('error', 'Belum ada laporan untuk kegiatan ini.');
+            return back()->with('error', 'Belum ada laporan yang disetujui (Approved) untuk kegiatan ini. Sistem pengarsipan otomatis hanya mengunduh dokumen yang telah sah.');
         }
 
-        // 1. Persiapan Path
         $slugEvent = Str::slug($activity->title);
         $tempFolderName = 'temp_' . $slugEvent . '_' . time();
         $tempPath = storage_path('app/temp/' . $tempFolderName);
-        $zipFileName = 'Laporan_' . $slugEvent . '.zip';
+        $zipFileName = 'Laporan_Sah_' . $slugEvent . '.zip';
         $zipPath = storage_path('app/temp/' . $zipFileName);
 
-        // 2. Buat folder sementara dan subfolder kategori
         $categories = ['Narasi', 'Keuangan', 'Dokumentasi'];
         foreach ($categories as $cat) {
             File::makeDirectory($tempPath . '/' . $cat, 0755, true, true);
         }
 
-        // 3. Salin dan ganti nama file laporan ke folder kategori
         foreach ($reports as $report) {
             $sourceFile = storage_path('app/public/' . $report->file_path);
-            
             if (File::exists($sourceFile)) {
                 $extension = File::extension($sourceFile);
-                
-                // Format Nama: nama_pegawai_kategori_judul.ext
                 $cleanName = Str::slug($report->user->name) . '_' . Str::slug($report->type) . '_' . Str::slug($report->title);
                 $newFileName = $cleanName . '.' . $extension;
 
-                // Tentukan subfolder tujuan (Mapping simple)
                 $subFolder = 'Dokumentasi';
                 if (Str::contains($report->type, 'Narasi')) $subFolder = 'Narasi';
                 if (Str::contains($report->type, 'Keuangan')) $subFolder = 'Keuangan';
@@ -86,14 +81,9 @@ class ReportController extends Controller
             }
         }
 
-        // 4. Proses Zipping
         $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
-            $files = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($tempPath),
-                \RecursiveIteratorIterator::LEAVES_ONLY
-            );
-
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($tempPath), \RecursiveIteratorIterator::LEAVES_ONLY);
             foreach ($files as $name => $file) {
                 if (!$file->isDir()) {
                     $filePath = $file->getRealPath();
@@ -104,148 +94,148 @@ class ReportController extends Controller
             $zip->close();
         }
 
-        // 5. Bersihkan Folder Sementara (Hanya hapus foldernya, bukan ZIP nya dulu)
         File::deleteDirectory($tempPath);
-
-        // 6. Kirim file ZIP ke browser dan hapus setelah terkirim
         return response()->download($zipPath)->deleteFileAfterSend(true);
     }
 
     /**
-     * Membaca isi file (DOCX/PDF/Gambar) dan membuat Ringkasan Eksekutif Otomatis menggunakan Gemini API
-     * VERSI PINTAR: Mendukung auto-fallback model dari gemini-2.5-flash ke gemini-1.5-flash jika tidak terdaftar
+     * API untuk merangkum file menggunakan Gemini.
      */
     public function summarize(Request $request) {
-        $request->validate([
-            'file' => 'required|file|max:10240'
-        ]);
-
+        $request->validate(['file' => 'required|file|max:10240']);
         $file = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
         $apiKey = env('GEMINI_API_KEY');
         
-        if (!$apiKey) {
-            return response()->json(['success' => false, 'message' => 'Konfigurasi GEMINI_API_KEY tidak ditemukan dalam file .env proyek Anda.'], 500);
-        }
+        if (!$apiKey) return response()->json(['success' => false, 'message' => 'Konfigurasi GEMINI_API_KEY tidak ditemukan.'], 500);
 
         $textToSummarize = "";
         $useDirectGemini = false;
 
-        // 1. Ekstraksi teks mandiri dari file Word (.docx) & Teks (.txt)
         if ($extension === 'docx') {
             if (class_exists(\ZipArchive::class)) {
                 $zip = new \ZipArchive;
                 if ($zip->open($file->getRealPath()) === true) {
                     if (($index = $zip->locateName('word/document.xml')) !== false) {
                         $xmlContent = $zip->getFromIndex($index);
-                        // Bersihkan tag XML untuk mendapatkan isi tulisan murni
                         $textToSummarize = html_entity_decode(strip_tags($xmlContent));
                     }
                     $zip->close();
                 }
-            } else {
-                // Jika ekstensi ZipArchive PHP mati, kirim langsung ke Gemini sebagai fallback
-                $useDirectGemini = true;
-            }
+            } else { $useDirectGemini = true; }
         } elseif ($extension === 'txt') {
             $textToSummarize = file_get_contents($file->getRealPath());
         } else {
-            // PDF & Gambar dikirim langsung menggunakan Model Visi Gemini
             $useDirectGemini = true;
         }
 
-        // 2. Prompt Standar Operasional Prosedur (SOP) Birokrasi Pemerintahan Indonesia
-        $prompt = "Tugas Anda adalah merangkum laporan administrasi kantor dinas instansi pemerintah. 
-                   Buatlah Ringkasan Eksekutif (Executive Summary) yang formal, baku, dan profesional dari dokumen berikut dalam 1-2 paragraf padat (maksimal 120 kata).
-                   
-                   STRUKTUR WAJIB YANG HARUS ADA:
-                   - Paragraf Awal: Deskripsikan pelaksanaan kegiatan secara formal (Nama agenda, waktu, dan tempat pelaksanaan).
-                   - Paragraf Tengah: Jabarkan pencapaian riil atau hasil nyata dari kegiatan tersebut secara objektif.
-                   - Paragraf Akhir: Sebutkan kendala lapangan yang dihadapi dan berikan satu rekomendasi perbaikan untuk pimpinan.
+        $prompt = "Tugas Anda merangkum laporan instansi pemerintah. Buat Executive Summary yang formal dalam 1-2 paragraf padat (maks 120 kata). STRUKTUR: Esensi kegiatan, pencapaian riil, kendala & rekomendasi. Bahasa sangat baku.";
 
-                   Gunakan Bahasa Indonesia yang sangat formal, baku, santun, dan langsung pada intinya.";
-
-        // Daftar model yang akan dicoba secara berurutan (Model Baru -> Model Lama)
         $modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
         $response = null;
         $success = false;
         $lastErrorMessage = 'Gagal memproses AI.';
 
-        // 3. Eksekusi Request dengan Multi-Model Fallback
         foreach ($modelsToTry as $modelName) {
             $url = "https://generativelanguage.googleapis.com/v1/models/{$modelName}:generateContent?key={$apiKey}";
-
             try {
                 if ($useDirectGemini) {
                     $fileData = base64_encode(file_get_contents($file));
                     $mimeType = $file->getMimeType();
-
-                    $response = Http::withoutVerifying()
-                        ->timeout(60)
-                        ->post($url, [
-                            "contents" => [["parts" => [
-                                ["text" => $prompt],
-                                ["inline_data" => ["mime_type" => $mimeType, "data" => $fileData]]
-                            ]]]
-                        ]);
+                    $response = Http::withoutVerifying()->timeout(60)->post($url, [
+                        "contents" => [["parts" => [["text" => $prompt], ["inline_data" => ["mime_type" => $mimeType, "data" => $fileData]]]]]
+                    ]);
                 } else {
-                    if (empty(trim($textToSummarize))) {
-                        $textToSummarize = "Dokumen Word kosong atau tidak dapat diekstrak teksnya.";
-                    }
-
-                    $response = Http::withoutVerifying()
-                        ->timeout(60)
-                        ->post($url, [
-                            "contents" => [["parts" => [
-                                ["text" => $prompt . "\n\nIsi Dokumen Mentah:\n" . Str::limit($textToSummarize, 8000)]
-                            ]]]
-                        ]);
+                    if (empty(trim($textToSummarize))) $textToSummarize = "Dokumen kosong.";
+                    $response = Http::withoutVerifying()->timeout(60)->post($url, [
+                        "contents" => [["parts" => [["text" => $prompt . "\n\nDokumen:\n" . Str::limit($textToSummarize, 8000)]]]]
+                    ]);
                 }
 
-                // Periksa apakah respons dari server Google sukses
                 if ($response->successful()) {
-                    $success = true;
-                    break; // Berhasil! Keluar dari loop pencarian model
+                    $success = true; break;
                 } else {
                     $errorBody = $response->json();
-                    $lastErrorMessage = isset($errorBody['error']['message']) ? $errorBody['error']['message'] : 'Respons tidak dikenal.';
-                    
-                    // Jika kesalahan karena model tidak ditemukan/tidak didukung, coba model berikutnya di dalam daftar loop
-                    if (Str::contains(strtolower($lastErrorMessage), ['not found', 'not supported', 'unsupported'])) {
-                        continue;
-                    }
-                    
-                    // Jika kesalahan lain (misalnya API key salah atau kuota habis), hentikan loop agar pesan error tampil
+                    $lastErrorMessage = isset($errorBody['error']['message']) ? $errorBody['error']['message'] : 'Error API.';
+                    if (Str::contains(strtolower($lastErrorMessage), ['not found', 'not supported'])) continue;
                     break;
                 }
-            } catch (\Exception $e) {
-                $lastErrorMessage = $e->getMessage();
-                continue; // Terjadi kendala jaringan/koneksi, coba model berikutnya
-            }
+            } catch (\Exception $e) { $lastErrorMessage = $e->getMessage(); continue; }
         }
 
-        // 4. Pengiriman Respon Akhir ke Frontend
         if ($success && $response) {
             $summaryResult = $response->json('candidates.0.content.parts.0.text');
-            
-            // Hilangkan format tebal markdown (*) agar teks nyaman diedit langsung oleh pegawai
             $cleanSummary = trim(str_replace(['*', '#', '_'], '', $summaryResult));
-
-            return response()->json([
-                'success' => true,
-                'summary' => $cleanSummary
-            ]);
+            return response()->json(['success' => true, 'summary' => $cleanSummary]);
         }
+        return response()->json(['success' => false, 'message' => 'Validasi AI gagal: ' . $lastErrorMessage], 400);
+    }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Validasi gagal di semua model: ' . $lastErrorMessage
-        ], 400);
+    public function updateSummary(Request $request, $id) {
+        if (Auth::user()->role !== 'admin') return response()->json(['success' => false], 403);
+        $request->validate(['executive_summary' => 'required|string']);
+        Report::findOrFail($id)->update(['executive_summary' => $request->executive_summary]);
+        return response()->json(['success' => true]);
+    }
+
+    // --- FITUR BARU: APPROVAL WORKFLOW ---
+
+    public function markAsReviewed($id) {
+        if (Auth::user()->role !== 'admin') return response()->json(['success' => false], 403);
+        $report = Report::findOrFail($id);
+        if($report->status === 'Submitted') {
+            $report->update(['status' => 'Reviewed']);
+        }
+        return response()->json(['success' => true, 'status' => $report->status]);
+    }
+
+    public function updateStatus(Request $request, $id) {
+        if (Auth::user()->role !== 'admin') return response()->json(['success' => false], 403);
+        $request->validate(['status' => 'required|in:Approved,Rejected']);
+        
+        $report = Report::findOrFail($id);
+        $report->status = $request->status;
+        $report->rejection_note = $request->status === 'Rejected' ? $request->rejection_note : null;
+        $report->save();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function revise(Request $request, $id) {
+        $report = Report::findOrFail($id);
+        if ($report->user_id !== Auth::id()) abort(403);
+
+        $request->validate([
+            'file' => 'required|mimes:pdf,doc,docx,xls,xlsx,jpg,png|max:10240',
+            'executive_summary' => 'required|string'
+        ]);
+
+        // Hapus file lama untuk cegah server membengkak
+        Storage::disk('public')->delete($report->file_path);
+
+        // Upload file baru
+        $file = $request->file('file');
+        $path = $file->store('reports', 'public');
+
+        // Reset Status & Update Data
+        $report->update([
+            'file_path' => $path,
+            'original_filename' => $file->getClientOriginalName(),
+            'executive_summary' => $request->executive_summary,
+            'status' => 'Submitted',
+            'rejection_note' => null, // Bersihkan catatan penolakan lama
+            'updated_at' => now()
+        ]);
+
+        return back()->with('success', 'Laporan berhasil direvisi dan dikembalikan ke antrean Admin!');
     }
 
     public function destroy($id) {
-        if(Auth::user()->role !== 'admin') abort(403);
         $report = Report::findOrFail($id);
+        // Pengecekan Keamanan: File Approved tidak boleh dihapus
+        if ($report->status === 'Approved' && Auth::user()->role !== 'admin') {
+            return back()->with('error', 'Laporan yang telah disetujui tidak dapat dihapus.');
+        }
         Storage::disk('public')->delete($report->file_path);
         $report->delete();
         return back()->with('success', 'Laporan dihapus.');

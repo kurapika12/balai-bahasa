@@ -173,9 +173,56 @@
     </div>
 </div>
 
+<!-- MODAL KHUSUS: REVISI BERKAS -->
+<div id="modalRevisi" class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-2xl max-w-md w-full overflow-hidden">
+        <div class="bg-red-600 px-6 py-4 flex justify-between items-center">
+            <h3 class="font-bold text-white"><i class="fa-solid fa-triangle-exclamation"></i> Revisi Berkas Laporan</h3>
+            <button type="button" onclick="document.getElementById('modalRevisi').classList.add('hidden')" class="text-white hover:text-red-200 transition">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <div class="bg-red-50 p-4 border-b border-red-100">
+            <p class="text-xs font-bold text-red-800 uppercase mb-1">Catatan Admin:</p>
+            <p id="revisiNote" class="text-sm text-red-900 italic font-medium">"..."</p>
+        </div>
+        <form id="formRevisi" method="POST" enctype="multipart/form-data" class="p-6 space-y-4">
+            @csrf
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Unggah File Pengganti</label>
+                <input type="file" id="revisiFileInput" name="file" class="w-full border border-gray-300 rounded p-2 text-xs file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-[10px] file:font-bold file:bg-red-50 file:text-red-700 hover:file:bg-red-100" required>
+                <p class="text-[10px] text-gray-400 mt-1">* File usang sebelumnya akan dihapus dari server.</p>
+            </div>
+            <div class="relative">
+                <label class="block text-[10px] font-bold text-blue-900 uppercase mb-1">Ringkasan AI (Pembaruan)</label>
+                <textarea name="executive_summary" id="revisiSummary" rows="4" class="w-full border-gray-300 rounded p-2 text-xs" placeholder="Tunggu proses baca AI setelah file dipilih..." required></textarea>
+                
+                <div id="revisiLoading" class="hidden absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded">
+                    <span class="text-xs font-bold text-blue-900 animate-pulse"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Memproses AI...</span>
+                </div>
+            </div>
+            <button type="submit" id="btnSubmitRevisi" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition shadow-md flex items-center justify-center gap-2">
+                <i class="fa-solid fa-upload"></i> Kirim Berkas Revisi
+            </button>
+        </form>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     const activitiesData = @json($activities);
+    const userId = {{ Auth::id() }};
+
+    function getStatusBadge(status) {
+        if(status === 'Approved') return `<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-green-200"><i class="fa-solid fa-shield-check mr-1"></i> Sah/Approved</span>`;
+        if(status === 'Rejected') return `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-red-200"><i class="fa-solid fa-xmark mr-1"></i> Butuh Revisi</span>`;
+        if(status === 'Reviewed') return `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-blue-200"><i class="fa-solid fa-glasses mr-1"></i> Diperiksa</span>`;
+        return `<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-yellow-200"><i class="fa-regular fa-clock mr-1"></i> Antrean</span>`;
+    }
+
+    function addslashes(str) { 
+        return (str + '').replace(/[\\"']/g, '\\$&').replace(/\u0000/g, '\\0'); 
+    }
 
     function openModal(id) {
         const activity = activitiesData.find(a => a.id === id);
@@ -209,16 +256,46 @@
                 const uploadDate = new Date(report.created_at).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'});
                 const uploader = report.user ? report.user.name : 'Unknown';
 
+                // Logika Approval Workflow Actions
+                let actionHtml = '';
+                const isMine = report.user_id === userId;
+
+                if (report.status === 'Approved') {
+                    actionHtml = `<span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 border border-green-200 rounded shadow-sm"><i class="fa-solid fa-lock mr-1"></i> Terkunci</span>`;
+                } else if (report.status === 'Rejected' && isMine) {
+                    actionHtml = `<button type="button" onclick="openRevisiModal(${report.id}, '${addslashes(report.rejection_note || '')}')" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-[10px] font-bold transition shadow-sm w-full"><i class="fa-solid fa-rotate mr-1"></i> REVISI</button>`;
+                } else if (isMine) {
+                    actionHtml = `<button type="button" onclick="confirmDelete(${report.id})" class="px-3 py-2 bg-gray-200 hover:bg-red-600 hover:text-white text-gray-600 rounded-md text-[10px] font-bold transition w-full"><i class="fa-solid fa-trash mr-1"></i> Tarik</button>`;
+                }
+
+                const rowClass = report.status === 'Rejected' ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-gray-100 hover:bg-blue-50 bg-white';
+
                 const html = `
-                    <div class="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-blue-50 transition group shadow-sm">
-                        <div class="flex items-center gap-4 overflow-hidden">
-                            <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0 text-lg shadow-sm"><i class="fa-solid ${icon}"></i></div>
-                            <div class="min-w-0">
-                                <h5 class="font-bold text-gray-800 text-sm uppercase tracking-tight truncate group-hover:text-blue-900">${report.title}</h5>
-                                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500 mt-1"><span class="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">${uploader}</span><span>•</span><span>${uploadDate}</span><span>•</span><span class="font-bold text-blue-600">${report.type}</span></div>
+                    <div class="p-4 border ${rowClass} rounded-xl transition group shadow-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex items-start gap-4 overflow-hidden flex-grow">
+                                <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0 text-lg shadow-sm border border-white"><i class="fa-solid ${icon}"></i></div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h5 class="font-bold text-gray-800 text-sm uppercase tracking-tight truncate group-hover:text-blue-900">${report.title}</h5>
+                                        ${getStatusBadge(report.status)}
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 mt-1">
+                                        <span class="font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">${uploader}</span>
+                                        <span>•</span><span>${uploadDate}</span><span>•</span><span class="font-bold text-blue-600">${report.type}</span>
+                                    </div>
+                                    ${report.status === 'Rejected' ? `
+                                        <div class="mt-3 p-2 bg-white border border-red-100 rounded text-xs text-red-700 font-medium">
+                                            <i class="fa-solid fa-arrow-turn-down text-red-400 mr-1"></i> Catatan Admin: <span class="italic">"${report.rejection_note}"</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-2 flex-shrink-0 w-28">
+                                <a href="/reports/${report.id}/download" class="w-full px-3 py-2 flex justify-center items-center bg-blue-50 text-blue-700 rounded-md hover:bg-blue-600 hover:text-white transition font-bold text-[10px]"><i class="fa-solid fa-download mr-1"></i> Unduh</a>
+                                ${actionHtml}
                             </div>
                         </div>
-                        <a href="/reports/${report.id}/download" class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-blue-50 text-blue-700 rounded-full hover:bg-blue-600 hover:text-white transition shadow-sm border border-blue-100"><i class="fa-solid fa-download"></i></a>
                     </div>`;
                 listContainer.insertAdjacentHTML('beforeend', html);
             });
@@ -242,97 +319,128 @@
         content.classList.add('scale-95');
         setTimeout(() => {
             modal.classList.add('hidden');
-            resetAiStatus();
+            resetAiStatus('executiveSummary', 'summaryLoading', 'submitBtn');
         }, 300);
     }
 
-    // --- INTEGRASI PINTAR AUTOMATIC SUMMARY GENERATOR ---
-    const fileInput = document.getElementById('fileInput');
-    const executiveSummary = document.getElementById('executiveSummary');
-    const summaryLoading = document.getElementById('summaryLoading');
-    const submitBtn = document.getElementById('submitBtn');
-
-    function resetAiStatus() {
-        executiveSummary.value = "";
-        summaryLoading.classList.add('hidden');
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    }
-
-    fileInput.addEventListener('change', async function() {
-        if (!this.files.length) return;
-        
-        const file = this.files[0];
-        
-        // Aktifkan visual loading
-        summaryLoading.classList.remove('hidden');
-        submitBtn.disabled = true;
-        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        executiveSummary.value = "";
-        executiveSummary.placeholder = "Sistem sedang mengurai berkas, mohon tunggu...";
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('_token', '{{ csrf_token() }}');
-
-        try {
-            const response = await fetch('{{ route('reports.summarize') }}', {
-                method: 'POST',
-                body: formData
-            });
-            
-            // Pengamanan Handshake Server: Cek jika respons tidak sukses (500/400)
-            if (!response.ok) {
-                const rawResponseText = await response.text();
-                let errMsg = "Terjadi kesalahan respons server.";
-                try {
-                    // Coba urai jika respons berformat JSON
-                    const errorObj = JSON.parse(rawResponseText);
-                    errMsg = errorObj.message || errMsg;
-                } catch(parseErr) {
-                    // Jika berupa HTML (error Laravel oranye), ambil baris pertamanya saja
-                    errMsg = rawResponseText.substring(0, 100) + "...";
-                }
-                throw new Error(errMsg);
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Tempelkan draf ringkasan dari AI langsung ke dalam textarea agar bisa dimodifikasi pegawai
-                executiveSummary.value = result.summary;
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Analisis AI Berhasil',
-                    text: 'Draf Ringkasan Eksekutif telah berhasil disiapkan oleh AI. Silakan baca dan sesuaikan teks di atas sebelum dikirim.',
-                    confirmButtonColor: '#1e3a8a'
-                });
-            } else {
-                throw new Error(result.message || "Gagal menyusun ringkasan otomatis.");
-            }
-        } catch (error) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Verifikasi Manual',
-                html: `<div class="text-left text-xs space-y-2">
-                        <p class="font-bold text-red-600">Catatan/Error Terdeteksi:</p>
-                        <p class="bg-gray-100 p-2 rounded font-mono text-[10px] break-all">${error.message}</p>
-                        <p class="text-gray-500">Jangan khawatir, Anda tetap bisa melapor dengan mengisi formulir ringkasan secara manual di layar.</p>
-                       </div>`,
-                confirmButtonColor: '#1e3a8a'
-            });
-            executiveSummary.placeholder = "Tulis ringkasan eksekutif laporan Anda secara manual di sini...";
-        } finally {
-            // Nonaktifkan visual loading
-            summaryLoading.classList.add('hidden');
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        }
-    });
-
+    // Modal click-outside & escape key
     document.getElementById('activityModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
     document.addEventListener('keydown', function(e) { if (e.key === "Escape") closeModal(); });
+
+    function openRevisiModal(reportId, note) {
+        document.getElementById('formRevisi').action = `/reports/${reportId}/revise`;
+        document.getElementById('revisiNote').innerText = `"${note}"`;
+        resetAiStatus('revisiSummary', 'revisiLoading', 'btnSubmitRevisi');
+        document.getElementById('revisiFileInput').value = '';
+        document.getElementById('modalRevisi').classList.remove('hidden');
+    }
+
+    function confirmDelete(id) {
+        Swal.fire({
+            title: 'Tarik Laporan?',
+            text: "Laporan yang ditarik akan dihapus secara permanen.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Ya, Tarik & Hapus'
+        }).then((res) => {
+            if(res.isConfirmed) {
+                const form = document.createElement('form');
+                form.method = 'POST'; form.action = '/reports/' + id;
+                form.innerHTML = `<input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="DELETE">`;
+                document.body.appendChild(form); form.submit();
+            }
+        });
+    }
+
+    // --- INTEGRASI PINTAR AUTOMATIC SUMMARY GENERATOR (REUSABLE) ---
+    function resetAiStatus(textareaId, loadingId, btnId) {
+        const textEl = document.getElementById(textareaId);
+        const loadEl = document.getElementById(loadingId);
+        const btnEl = document.getElementById(btnId);
+        
+        textEl.value = "";
+        loadEl.classList.add('hidden');
+        btnEl.disabled = false;
+        btnEl.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+
+    function setupAiScanner(inputId, textareaId, loadingId, btnId) {
+        document.getElementById(inputId).addEventListener('change', async function() {
+            if (!this.files.length) return;
+            
+            const file = this.files[0];
+            const textEl = document.getElementById(textareaId);
+            const loadEl = document.getElementById(loadingId);
+            const btnEl = document.getElementById(btnId);
+            
+            // Aktifkan visual loading
+            loadEl.classList.remove('hidden');
+            btnEl.disabled = true;
+            btnEl.classList.add('opacity-50', 'cursor-not-allowed');
+            textEl.value = "";
+            textEl.placeholder = "Sistem sedang mengurai berkas, mohon tunggu...";
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('_token', '{{ csrf_token() }}');
+
+            try {
+                const response = await fetch('{{ route('reports.summarize') }}', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const rawResponseText = await response.text();
+                    let errMsg = "Terjadi kesalahan respons server.";
+                    try {
+                        const errorObj = JSON.parse(rawResponseText);
+                        errMsg = errorObj.message || errMsg;
+                    } catch(parseErr) {
+                        errMsg = rawResponseText.substring(0, 100) + "...";
+                    }
+                    throw new Error(errMsg);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    textEl.value = result.summary;
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Analisis AI Berhasil',
+                        text: 'Draf Ringkasan Eksekutif telah berhasil disiapkan oleh AI. Silakan baca dan sesuaikan teks di atas sebelum dikirim.',
+                        confirmButtonColor: '#1e3a8a'
+                    });
+                } else {
+                    throw new Error(result.message || "Gagal menyusun ringkasan otomatis.");
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Verifikasi Manual',
+                    html: `<div class="text-left text-xs space-y-2">
+                            <p class="font-bold text-red-600">Catatan/Error Terdeteksi:</p>
+                            <p class="bg-gray-100 p-2 rounded font-mono text-[10px] break-all">${error.message}</p>
+                            <p class="text-gray-500">Jangan khawatir, Anda tetap bisa melapor dengan mengetik ringkasan secara manual di layar.</p>
+                           </div>`,
+                    confirmButtonColor: '#1e3a8a'
+                });
+                textEl.placeholder = "Tulis ringkasan eksekutif laporan Anda secara manual di sini...";
+            } finally {
+                // Nonaktifkan visual loading
+                loadEl.classList.add('hidden');
+                btnEl.disabled = false;
+                btnEl.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    }
+
+    // Inisialisasi Scanner AI untuk Form Upload Baru dan Form Revisi
+    setupAiScanner('fileInput', 'executiveSummary', 'summaryLoading', 'submitBtn');
+    setupAiScanner('revisiFileInput', 'revisiSummary', 'revisiLoading', 'btnSubmitRevisi');
+
 </script>
 
 <style>

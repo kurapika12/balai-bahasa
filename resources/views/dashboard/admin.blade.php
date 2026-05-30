@@ -386,7 +386,7 @@
     </div>
 </div>
 
-<!-- MODAL: TAMBAH / EDIT PEGAWAI (Same as Previous Version) -->
+<!-- MODAL: TAMBAH / EDIT PEGAWAI -->
 <div id="modalNewUser" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
     <div class="bg-white rounded-lg shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
         <div class="bg-yellow-500 px-6 py-4 flex justify-between items-center text-white">
@@ -439,6 +439,14 @@
         });
     }
 
+    // Fungsi Render Status Badge
+    function getStatusBadge(status) {
+        if(status === 'Approved') return `<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold border border-green-200"><i class="fa-solid fa-check-double mr-1"></i>Approved</span>`;
+        if(status === 'Rejected') return `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Rejected</span>`;
+        if(status === 'Reviewed') return `<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-200"><i class="fa-solid fa-glasses mr-1"></i>Reviewed</span>`;
+        return `<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-200"><i class="fa-regular fa-hourglass-half mr-1"></i>Submitted</span>`;
+    }
+
     function openAdminModal(id) {
         const activity = activitiesData.find(a => a.id === id);
         if(!activity) return;
@@ -487,7 +495,7 @@
             document.getElementById('modalEditActivity').classList.remove('hidden');
         };
 
-        // 5. Populate Reports
+        // 5. Populate Reports with Status
         const listContainer = document.getElementById('admReportsList');
         document.getElementById('admReportCount').innerText = activity.reports.length + ' Berkas';
         listContainer.innerHTML = '';
@@ -501,22 +509,22 @@
                 if(report.type === 'Keuangan') { iconColor = 'bg-green-100 text-green-600'; icon = 'fa-file-invoice-dollar'; }
                 else if(report.type === 'Dokumentasi') { iconColor = 'bg-purple-100 text-purple-600'; icon = 'fa-images'; }
 
-                const dateStr = new Date(report.created_at).toLocaleDateString('id-ID', {day:'numeric', month:'short'});
-
                 const html = `
-                    <div class="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-blue-50 transition group">
-                        <div class="flex items-center gap-3 overflow-hidden">
-                            <div class="h-9 w-9 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0"><i class="fa-solid ${icon}"></i></div>
-                            <div class="min-w-0">
-                                <h5 class="font-bold text-gray-800 text-xs truncate uppercase tracking-tight">${report.title}</h5>
-                                <p class="text-[10px] text-gray-500 font-medium">${report.user.name} • ${dateStr} • ${report.type}</p>
+                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition group" id="reportRow-${report.id}">
+                        <div class="flex items-center gap-4">
+                            <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center border shadow-sm"><i class="fa-solid ${icon} text-xl"></i></div>
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h5 class="font-bold text-gray-800 text-sm truncate uppercase tracking-tight">${report.title}</h5>
+                                    ${getStatusBadge(report.status)}
+                                </div>
+                                <p class="text-[10px] text-gray-500 font-medium">${report.user.name} • ${report.type}</p>
                             </div>
                         </div>
                         <div class="flex gap-2">
-                            <!-- Tombol Mata Berubah Mengirimkan Parameter ID Berkas (Mencegah Quote-Breaking bug) -->
-                            <button onclick="showReportDetail(${report.id}, '/reports/${report.id}/download')" class="h-8 w-8 flex items-center justify-center bg-gray-100 hover:bg-yellow-100 hover:text-yellow-600 text-gray-500 rounded transition shadow-sm" title="Pratinjau & Ringkasan AI"><i class="fa-solid fa-eye"></i></button>
-                            <a href="/reports/${report.id}/download" class="h-8 w-8 flex items-center justify-center bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 rounded transition shadow-sm"><i class="fa-solid fa-download"></i></a>
-                            <button onclick="confirmDeleteReport(${report.id})" class="h-8 w-8 flex items-center justify-center bg-red-50 hover:bg-red-600 hover:text-white text-red-600 rounded transition shadow-sm"><i class="fa-solid fa-trash"></i></button>
+                            <button onclick="inspectReport(${report.id})" class="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded text-xs font-bold transition shadow-sm">
+                                <i class="fa-solid fa-magnifying-glass"></i> Periksa Detail
+                            </button>
                         </div>
                     </div>`;
                 listContainer.insertAdjacentHTML('beforeend', html);
@@ -550,26 +558,58 @@
     }
 
     /**
-     * Tampilan Detail Berkas Cerdas (Swal) yang menampilkan Textarea Ringkasan AI yang dapat diedit langsung
+     * Tampilan Detail Berkas Cerdas (Swal) yang menampilkan Textarea Ringkasan AI yang dapat diedit langsung, 
+     * Auto Review, dan Tombol Approval.
      */
-    function showReportDetail(reportId, downloadUrl) {
-        // Cari objek berkas laporan di dalam data aktivitas lokal secara aman
+    async function inspectReport(reportId) {
         let report = null;
-        for (const activity of activitiesData) {
-            report = activity.reports.find(r => r.id === reportId);
+        for (const act of activitiesData) {
+            report = act.reports.find(r => r.id === reportId);
             if (report) break;
         }
-        
         if (!report) return;
+
+        // Auto-Review Mechanism (AJAX background silences)
+        if (report.status === 'Submitted') {
+            try {
+                const res = await fetch(`/reports/${reportId}/mark-reviewed`, {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if(data.success) {
+                    report.status = 'Reviewed'; // Update state lokal
+                    document.getElementById(`reportRow-${reportId}`).outerHTML = generateUpdatedRow(report); // Refresh row UI
+                }
+            } catch (e) { console.error('Auto-review failed', e); }
+        }
 
         const title = report.title;
         const type = report.type;
         const user = report.user ? report.user.name : 'Unknown';
         const desc = report.description || 'Tidak ada keterangan tambahan.';
         const summary = report.executive_summary || 'Belum ada ringkasan eksekutif (AI) untuk berkas laporan ini.';
+        const downloadUrl = `/reports/${report.id}/download`;
+
+        // Tampilkan Detail Lengkap & Keputusan
+        let actionButtons = '';
+        if(report.status !== 'Approved') {
+            actionButtons = `
+                <div class="grid grid-cols-2 gap-3 mt-5 pt-4 border-t">
+                    <button onclick="decideReport(${report.id}, 'Rejected')" class="py-2.5 bg-red-100 text-red-700 hover:bg-red-600 hover:text-white rounded-lg font-bold border border-red-200 transition text-sm">
+                        <i class="fa-solid fa-xmark mr-1"></i> Tolak & Minta Revisi
+                    </button>
+                    <button onclick="decideReport(${report.id}, 'Approved')" class="py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold shadow-md transition text-sm">
+                        <i class="fa-solid fa-check mr-1"></i> Setujui Berkas Sah
+                    </button>
+                </div>
+            `;
+        } else {
+            actionButtons = `<div class="mt-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-center text-xs font-bold"><i class="fa-solid fa-shield-check"></i> Berkas ini telah sah dan masuk arsip negara.</div>`;
+        }
 
         Swal.fire({
-            title: `<div class="text-base font-bold text-blue-900 flex items-center gap-2"><i class="fa-solid fa-circle-nodes text-blue-600 animate-pulse"></i> Pratinjau & Ringkasan Berkas</div>`,
+            title: `<div class="text-base font-bold text-blue-900 flex items-center gap-2"><i class="fa-solid fa-file-signature text-blue-600"></i> Audit Berkas & Persetujuan</div>`,
             html: `
                 <div class="text-left text-xs text-gray-600 p-2 border-t mt-4 space-y-4">
                     <!-- Metadata Info -->
@@ -600,7 +640,7 @@
                             <span><i class="fa-solid fa-robot text-blue-600"></i> Ringkasan Eksekutif (AI)</span>
                             <span class="text-[8px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Bisa Diedit Admin</span>
                         </label>
-                        <form id="formUpdateSummary" onsubmit="handleUpdateSummary(event, ${reportId})">
+                        <form id="formUpdateSummary" onsubmit="handleUpdateSummary(event, ${report.id})">
                             <textarea id="admExecutiveSummary" name="executive_summary" rows="5" class="w-full border-gray-300 rounded-lg shadow-sm text-xs p-3 border bg-white focus:ring-blue-500 focus:border-blue-500 font-medium leading-relaxed" placeholder="Tulis atau edit ringkasan laporan..." required>${summary}</textarea>
                             
                             <div class="mt-4 flex justify-between items-center gap-2">
@@ -610,11 +650,63 @@
                             </div>
                         </form>
                     </div>
+                    
+                    ${actionButtons}
                 </div>
             `,
             showConfirmButton: false,
-            showCloseButton: true
+            showCloseButton: true,
+            width: '600px'
         });
+    }
+
+    /**
+     * Eksekusi Persetujuan / Penolakan Laporan
+     */
+    async function decideReport(reportId, decision) {
+        let note = null;
+        
+        if (decision === 'Rejected') {
+            const { value: text } = await Swal.fire({
+                title: 'Alasan Penolakan',
+                input: 'textarea',
+                inputPlaceholder: 'Ketik alasan mengapa laporan ini ditolak agar pegawai dapat merevisinya...',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Tolak Laporan',
+                cancelButtonText: 'Batal'
+            });
+            if (!text) return; // Batal jika kosong
+            note = text;
+        } else {
+            const confirm = await Swal.fire({
+                title: 'Setujui Laporan?',
+                text: 'Setelah disetujui, berkas ini akan dikunci dan siap diarsipkan.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#16a34a',
+                confirmButtonText: 'Ya, Sahkan!'
+            });
+            if (!confirm.isConfirmed) return;
+        }
+
+        // AJAX Update Status
+        try {
+            const formData = new FormData();
+            formData.append('status', decision);
+            if(note) formData.append('rejection_note', note);
+            formData.append('_token', '{{ csrf_token() }}');
+            formData.append('_method', 'PATCH');
+
+            const res = await fetch(`/reports/${reportId}/update-status`, { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if (data.success) {
+                Swal.fire('Berhasil!', `Laporan telah di-${decision.toLowerCase()}.`, 'success').then(() => location.reload());
+            }
+        } catch (error) {
+            Swal.fire('Error', 'Terjadi kesalahan sistem.', 'error');
+        }
     }
 
     /**
@@ -633,7 +725,6 @@
         formData.append('_token', '{{ csrf_token() }}');
 
         try {
-            // Mengirimkan pembaruan ringkasan langsung ke Controller
             const response = await fetch(`/reports/${reportId}/update-summary`, {
                 method: 'POST',
                 body: formData
@@ -641,19 +732,18 @@
             const result = await response.json();
 
             if (result.success) {
-                // Perbarui data lokal (activitiesData) secara instan agar tidak perlu reload halaman
+                // Perbarui data lokal secara instan
                 activitiesData.forEach(act => {
                     const rep = act.reports.find(r => r.id === reportId);
-                    if (rep) {
-                        rep.executive_summary = summaryValue;
-                    }
+                    if (rep) rep.executive_summary = summaryValue;
                 });
 
                 Swal.fire({
                     icon: 'success',
                     title: 'Berhasil Disimpan',
                     text: 'Ringkasan eksekutif berhasil diperbarui dan dikunci dalam database.',
-                    confirmButtonColor: '#1e3a8a'
+                    confirmButtonColor: '#1e3a8a',
+                    timer: 1500
                 });
             } else {
                 throw new Error(result.message || "Gagal memperbarui database.");
@@ -665,9 +755,36 @@
                 text: error.message || 'Terjadi hambatan koneksi saat mengirim data.',
                 confirmButtonColor: '#1e3a8a'
             });
+        } finally {
             btn.disabled = false;
             btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Simpan Ringkasan`;
         }
+    }
+
+    function generateUpdatedRow(report) {
+        let iconColor = 'bg-blue-100 text-blue-600';
+        let icon = 'fa-file-lines';
+        if(report.type === 'Keuangan') { iconColor = 'bg-green-100 text-green-600'; icon = 'fa-file-invoice-dollar'; }
+        else if(report.type === 'Dokumentasi') { iconColor = 'bg-purple-100 text-purple-600'; icon = 'fa-images'; }
+
+        return `
+        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition group" id="reportRow-${report.id}">
+            <div class="flex items-center gap-4">
+                <div class="h-10 w-10 rounded-lg ${iconColor} flex items-center justify-center border shadow-sm"><i class="fa-solid ${icon} text-xl"></i></div>
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <h5 class="font-bold text-gray-800 text-sm truncate uppercase tracking-tight">${report.title}</h5>
+                        ${getStatusBadge(report.status)}
+                    </div>
+                    <p class="text-[10px] text-gray-500 font-medium">${report.user.name} • ${report.type}</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="inspectReport(${report.id})" class="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded text-xs font-bold transition shadow-sm">
+                    <i class="fa-solid fa-magnifying-glass"></i> Periksa Detail
+                </button>
+            </div>
+        </div>`;
     }
 
     function confirmDeleteActivity(button) {
@@ -679,24 +796,6 @@
             confirmButtonColor: '#d33',
             confirmButtonText: 'Ya, Hapus Semua!'
         }).then((res) => { if(res.isConfirmed) button.closest('form').submit(); });
-    }
-
-    function confirmDeleteReport(id) {
-        Swal.fire({
-            title: 'Hapus Berkas?',
-            text: "Tindakan ini tidak bisa dibatalkan.",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Ya, Hapus!'
-        }).then((res) => {
-            if(res.isConfirmed) {
-                const form = document.createElement('form');
-                form.method = 'POST'; form.action = '/reports/' + id;
-                form.innerHTML = `<input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="DELETE">`;
-                document.body.appendChild(form); form.submit();
-            }
-        });
     }
 
     function confirmDeleteUser(e, form) {
